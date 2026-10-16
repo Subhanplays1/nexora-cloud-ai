@@ -1,24 +1,95 @@
 import React from 'react';
 
-export type BotShape =
-  | 'squircle'
-  | 'circle'
-  | 'cup'
-  | 'capsule'
-  | 'triangle'
-  | 'hexagon'
-  | 'cloud'
-  | 'teardrop';
+import orchestratorImg from '../../assets/avatars/orchestrator.png';
+import researchImg from '../../assets/avatars/research.png';
+import writingImg from '../../assets/avatars/writing.png';
+import imageImg from '../../assets/avatars/image.png';
+import videoImg from '../../assets/avatars/video.png';
+import browserImg from '../../assets/avatars/browser.png';
+import developerImg from '../../assets/avatars/developer.png';
+import socialImg from '../../assets/avatars/social.png';
+import operationsImg from '../../assets/avatars/operations.png';
+import filesImg from '../../assets/avatars/files.png';
 
-export const BOT_SHAPES: { key: BotShape; name: string }[] = [
-  { key: 'squircle', name: 'Squircle' },
-  { key: 'circle', name: 'Round' },
-  { key: 'cup', name: 'Cup' },
-  { key: 'capsule', name: 'Capsule' },
-  { key: 'triangle', name: 'Triangle' },
-  { key: 'hexagon', name: 'Hexagon' },
-  { key: 'cloud', name: 'Cloud' },
-  { key: 'teardrop', name: 'Drop' },
+export interface BotCharacter {
+  key: string;
+  name: string;
+  role: string;
+  img: string;
+  defaultColor: string;
+}
+
+export const BOT_CHARACTERS: BotCharacter[] = [
+  {
+    key: 'orchestrator',
+    name: 'Orchestrator',
+    role: 'Commander & Planner',
+    img: orchestratorImg,
+    defaultColor: '#3B82F6',
+  },
+  {
+    key: 'research',
+    name: 'Researcher',
+    role: 'Deep Web & Intel',
+    img: researchImg,
+    defaultColor: '#3B82F6',
+  },
+  {
+    key: 'writing',
+    name: 'Writer',
+    role: 'Scripts & Copywriting',
+    img: writingImg,
+    defaultColor: '#8B5CF6',
+  },
+  {
+    key: 'image',
+    name: 'Artist',
+    role: 'Visuals & UI Design',
+    img: imageImg,
+    defaultColor: '#10B981',
+  },
+  {
+    key: 'video',
+    name: 'Director',
+    role: 'Video & Timeline',
+    img: videoImg,
+    defaultColor: '#EF4444',
+  },
+  {
+    key: 'browser',
+    name: 'Navigator',
+    role: 'Web Browser & Actions',
+    img: browserImg,
+    defaultColor: '#F97316',
+  },
+  {
+    key: 'developer',
+    name: 'Engineer',
+    role: 'Code & Sandboxes',
+    img: developerImg,
+    defaultColor: '#14B8A6',
+  },
+  {
+    key: 'social',
+    name: 'Messenger',
+    role: 'Inbox & Communication',
+    img: socialImg,
+    defaultColor: '#EC4899',
+  },
+  {
+    key: 'operations',
+    name: 'Operations',
+    role: 'Overnight & DevOps',
+    img: operationsImg,
+    defaultColor: '#F59E0B',
+  },
+  {
+    key: 'files',
+    name: 'Vault Keeper',
+    role: 'Files & Storage',
+    img: filesImg,
+    defaultColor: '#4B5563',
+  },
 ];
 
 export const PALETTE_COLORS = [
@@ -34,12 +105,42 @@ export const PALETTE_COLORS = [
   { name: 'Slate', hex: '#4B5563' },
 ];
 
+const charKeyMap: Record<string, string> = {
+  orchestrator: 'orchestrator',
+  research: 'research',
+  writing: 'writing',
+  image: 'image',
+  video: 'video',
+  browser: 'browser',
+  developer: 'developer',
+  social: 'social',
+  operations: 'operations',
+  files: 'files',
+  // Geometric fallbacks to corresponding 3D characters
+  circle: 'orchestrator',
+  teardrop: 'research',
+  capsule: 'writing',
+  triangle: 'image',
+  squircle: 'developer',
+  cup: 'browser',
+  cloud: 'social',
+  hexagon: 'operations',
+};
+
+export const getCharacterByKey = (key?: string): BotCharacter => {
+  const norm = (key || 'orchestrator').toLowerCase();
+  const matchedKey = charKeyMap[norm] || 'orchestrator';
+  return BOT_CHARACTERS.find((c) => c.key === matchedKey) || BOT_CHARACTERS[0];
+};
+
 interface BotAvatarProps {
   shape?: string;
+  characterKey?: string;
   color?: string;
-  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | number;
+  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl' | number;
   className?: string;
   showGlow?: boolean;
+  roundness?: 'full' | 'rounded';
 }
 
 const sizeMap = {
@@ -48,131 +149,42 @@ const sizeMap = {
   md: 44,
   lg: 64,
   xl: 96,
-};
-
-// Map legacy worker avatar keys to cute shapes
-const legacyKeyToShape: Record<string, BotShape> = {
-  orchestrator: 'circle',
-  operations: 'hexagon',
-  social: 'cloud',
-  developer: 'squircle',
-  research: 'teardrop',
-  writing: 'capsule',
-  browser: 'cup',
-  image: 'triangle',
-  video: 'squircle',
-  files: 'circle',
-};
-
-export const normalizeBotShape = (shapeOrKey?: string): BotShape => {
-  if (!shapeOrKey) return 'circle';
-  if (BOT_SHAPES.some((s) => s.key === shapeOrKey)) {
-    return shapeOrKey as BotShape;
-  }
-  return legacyKeyToShape[shapeOrKey] || 'circle';
+  '2xl': 120,
 };
 
 export const BotAvatar: React.FC<BotAvatarProps> = ({
-  shape = 'circle',
-  color = '#3B82F6',
+  shape,
+  characterKey,
+  color,
   size = 'md',
   className = '',
   showGlow = false,
+  roundness = 'full',
 }) => {
+  const char = getCharacterByKey(characterKey || shape);
+  const effectiveColor = color || char.defaultColor || '#3B82F6';
   const pixelSize = typeof size === 'number' ? size : sizeMap[size] || 44;
-  const normalizedShape = normalizeBotShape(shape);
 
-  const renderShapePath = () => {
-    switch (normalizedShape) {
-      case 'squircle':
-        return <rect x="8" y="8" width="84" height="84" rx="26" fill={color} />;
-      case 'circle':
-        return <circle cx="50" cy="50" r="44" fill={color} />;
-      case 'cup':
-        return (
-          <path
-            d="M 14 24 Q 14 18 22 18 L 78 18 Q 86 18 86 24 L 78 72 Q 76 84 64 86 L 36 86 Q 24 84 22 72 Z"
-            fill={color}
-          />
-        );
-      case 'capsule':
-        return <rect x="8" y="22" width="84" height="56" rx="28" fill={color} />;
-      case 'triangle':
-        return (
-          <path
-            d="M 44 18 Q 50 10 56 18 L 88 68 Q 94 78 84 82 L 16 82 Q 6 78 12 68 Z"
-            fill={color}
-          />
-        );
-      case 'hexagon':
-        return (
-          <polygon
-            points="50,14 86,34 86,70 50,90 14,70 14,34"
-            fill={color}
-            stroke={color}
-            strokeWidth="10"
-            strokeLinejoin="round"
-          />
-        );
-      case 'cloud':
-        return (
-          <path
-            d="M 28 78 L 74 78 C 86 78 88 66 86 58 C 84 50 78 48 74 48 C 72 32 58 26 48 28 C 38 30 34 38 32 44 C 20 44 14 54 16 64 C 18 74 24 78 28 78 Z"
-            fill={color}
-          />
-        );
-      case 'teardrop':
-        return (
-          <path
-            d="M 50 12 C 50 12 84 48 84 66 C 84 82 70 90 50 90 C 30 90 16 82 16 66 C 16 48 50 12 50 12 Z"
-            fill={color}
-          />
-        );
-      default:
-        return <circle cx="50" cy="50" r="44" fill={color} />;
-    }
-  };
+  const roundedClass = roundness === 'full' ? 'rounded-full' : 'rounded-2xl';
 
   return (
     <div
-      className={`inline-flex items-center justify-center relative flex-shrink-0 select-none ${className}`}
+      className={`relative inline-flex items-center justify-center flex-shrink-0 select-none ${roundedClass} ${className}`}
       style={{
         width: pixelSize,
         height: pixelSize,
-        filter: showGlow ? `drop-shadow(0 6px 16px ${color}60)` : undefined,
+        backgroundColor: `${effectiveColor}18`,
+        border: `1.5px solid ${effectiveColor}40`,
+        boxShadow: showGlow ? `0 10px 25px ${effectiveColor}35` : undefined,
       }}
+      title={`${char.name} (${char.role})`}
     >
-      <svg
-        viewBox="0 0 100 100"
-        width={pixelSize}
-        height={pixelSize}
-        className="w-full h-full overflow-visible"
-      >
-        {/* Geometric Shape Body */}
-        {renderShapePath()}
-
-        {/* Signature Slanted Cut-Out White Eyes */}
-        <g fill="#FFFFFF">
-          {/* Left Eye */}
-          <rect
-            x="40"
-            y="43"
-            width="6"
-            height="15"
-            rx="3"
-            transform="rotate(-18 43 50.5)"
-          />
-          {/* Right Eye */}
-          <rect
-            x="56"
-            y="43"
-            width="6"
-            height="15"
-            rx="3"
-            transform="rotate(-18 59 50.5)"
-          />
-        </g>
-      </svg>
+      <img
+        src={char.img}
+        alt={char.name}
+        className="w-full h-full object-contain p-0.5 filter drop-shadow-sm select-none pointer-events-none transition-transform duration-200 hover:scale-105"
+        draggable={false}
+      />
     </div>
   );
 };
