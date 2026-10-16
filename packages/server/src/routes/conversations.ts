@@ -6,15 +6,16 @@ import { taskQueue } from '../queue/index.js';
 import { wsGateway } from '../websocket/index.js';
 
 export async function conversationRoutes(fastify: FastifyInstance): Promise<void> {
-  // List all conversations
-  fastify.get('/api/conversations', async () => {
-    return db.listConversations();
+  // List conversations (optionally filtered by agentId)
+  fastify.get('/api/conversations', async (req: FastifyRequest<{ Querystring: { agentId?: string } }>) => {
+    return db.listConversations(req.query.agentId);
   });
 
-  // Create new conversation
-  fastify.post('/api/conversations', async (req: FastifyRequest<{ Body: { title?: string } }>) => {
+  // Create new conversation for a specific agent
+  fastify.post('/api/conversations', async (req: FastifyRequest<{ Body: { title?: string; agentId?: string } }>) => {
     const title = req.body?.title || 'New Task Session';
-    return db.createConversation(title);
+    const agentId = req.body?.agentId || 'main-orchestrator';
+    return db.createConversation(title, agentId);
   });
 
   // Get specific conversation with full messages
@@ -41,11 +42,13 @@ export async function conversationRoutes(fastify: FastifyInstance): Promise<void
         Body: { content: string; executeAsTask?: boolean; agentId?: string };
       }>
     ) => {
-      const { content, executeAsTask = true, agentId = 'main-orchestrator' } = req.body;
+      const { content, executeAsTask = true, agentId } = req.body;
       const conversationId = req.params.id;
 
-      // 1. Fetch the active agent and its persistent memory
-      const activeAgent = (await db.getAgent(agentId)) || (await db.getAgent('main-orchestrator'));
+      // 1. Fetch conversation and active agent
+      const conv = await db.getConversation(conversationId);
+      const effectiveAgentId = agentId || conv?.agentId || 'main-orchestrator';
+      const activeAgent = (await db.getAgent(effectiveAgentId)) || (await db.getAgent('main-orchestrator'));
 
       // 2. Save user message
       const userMsg = await db.createMessage({

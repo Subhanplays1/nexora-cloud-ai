@@ -1,48 +1,27 @@
 import React, { useState } from 'react';
-import { Sparkles, ArrowRight, Bot, Check, Loader2 } from 'lucide-react';
+import { Sparkles, ArrowRight, Loader2, Bot } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
-import { WorkerAvatar } from '../common/WorkerAvatar';
+import {
+  BotAvatar,
+  BOT_SHAPES,
+  PALETTE_COLORS,
+  BotShape,
+} from '../common/BotAvatar';
 
-export const PALETTE_COLORS = [
-  { name: 'Brown', hex: '#8B5A2B' },
-  { name: 'Red', hex: '#EF4444' },
-  { name: 'Orange', hex: '#F97316' },
-  { name: 'Yellow', hex: '#F59E0B' },
-  { name: 'Green', hex: '#10B981' },
-  { name: 'Teal', hex: '#14B8A6' },
-  { name: 'Blue', hex: '#3B82F6' },
-  { name: 'Purple', hex: '#8B5CF6' },
-  { name: 'Pink', hex: '#EC4899' },
-  { name: 'Slate', hex: '#4B5563' },
-];
-
-export const MASCOT_KEYS = [
-  'orchestrator',
-  'research',
-  'writing',
-  'image',
-  'video',
-  'browser',
-  'developer',
-  'social',
-  'operations',
-  'files',
-];
-
-interface SuggestionCard {
+interface SuggestionPreset {
   name: string;
   description: string;
-  avatarKey: string;
+  shape: BotShape;
   colorHex: string;
   systemPrompt: string;
   initialFacts: string[];
 }
 
-const SUGGESTIONS: SuggestionCard[] = [
+const PRESET_SUGGESTIONS: SuggestionPreset[] = [
   {
     name: 'Night Shift',
     description: 'Works overnight and preps your morning digest',
-    avatarKey: 'operations',
+    shape: 'hexagon',
     colorHex: '#F97316',
     systemPrompt:
       'You are Night Shift, a tireless overnight autonomous worker. You organize tasks, run health checks, prepare morning briefings, and summarize overnight events while the user sleeps.',
@@ -54,7 +33,7 @@ const SUGGESTIONS: SuggestionCard[] = [
   {
     name: 'Inbox Triage',
     description: 'Sorts your email and drafts replies in your voice',
-    avatarKey: 'social',
+    shape: 'cloud',
     colorHex: '#EC4899',
     systemPrompt:
       'You are Inbox Triage, an expert communication assistant. You categorize incoming messages, prioritize urgency, draft contextual replies matching the user style, and shield from spam.',
@@ -64,26 +43,26 @@ const SUGGESTIONS: SuggestionCard[] = [
     ],
   },
   {
-    name: 'Research Analyst',
+    name: 'Research Scout',
     description: 'Conducts deep technical research and cites verified sources',
-    avatarKey: 'research',
+    shape: 'teardrop',
     colorHex: '#3B82F6',
     systemPrompt:
-      'You are Research Analyst, an inquisitive and analytical intelligence bot. You cross-check sources, conduct deep web investigations, compile structured briefs, and cite references accurately.',
+      'You are Research Scout, an analytical intelligence bot. You cross-check sources, conduct deep investigations, compile structured briefs, and cite references accurately.',
     initialFacts: [
       'Prefers bullet-pointed executive summaries',
       'Always cites sources and dates',
     ],
   },
   {
-    name: 'Code Architect',
-    description: 'Scaffolds full-stack apps and executes sandboxed terminal tests',
-    avatarKey: 'developer',
+    name: 'Code Crafter',
+    description: 'Scaffolds full-stack apps and verifies tests in persistent sandboxes',
+    shape: 'squircle',
     colorHex: '#14B8A6',
     systemPrompt:
-      'You are Code Architect, a senior engineering bot. You scaffold modern applications, write clean modular TypeScript code, and verify tests in persistent sandboxes.',
+      'You are Code Crafter, a senior engineering bot. You scaffold modern applications, write clean modular TypeScript code, and verify tests in persistent sandboxes.',
     initialFacts: [
-      'Primary workspace is on drive D:',
+      'Primary workspace is on drive D:\\nexora-ai',
       'Favors TypeScript, React 19, and Tailwind CSS',
     ],
   },
@@ -95,7 +74,7 @@ export const BotCreatorView: React.FC = () => {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [selectedColor, setSelectedColor] = useState('#3B82F6');
-  const [selectedMascot, setSelectedMascot] = useState('orchestrator');
+  const [selectedShape, setSelectedShape] = useState<BotShape>('circle');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAiGenerating, setIsAiGenerating] = useState(false);
 
@@ -108,9 +87,9 @@ export const BotCreatorView: React.FC = () => {
       await createAgent({
         name: botName,
         description: description.trim() || 'Custom autonomous desktop assistant',
-        avatarKey: selectedMascot,
+        avatarKey: selectedShape,
         colorHex: selectedColor,
-        systemPrompt: `You are ${botName}, a specialized autonomous personal assistant created to help the user. Always remember context, follow instructions strictly, and execute tasks thoroughly.`,
+        systemPrompt: `You are ${botName}, a specialized autonomous personal assistant created exclusively for Subhan Zahid. Always remember context, follow instructions strictly, and execute tasks thoroughly.`,
         initialFacts: description.trim() ? [`Primary focus: ${description.trim()}`] : [],
       });
     } catch (err) {
@@ -120,10 +99,10 @@ export const BotCreatorView: React.FC = () => {
     }
   };
 
-  const handleApplySuggestion = (s: SuggestionCard) => {
+  const handleApplySuggestion = (s: SuggestionPreset) => {
     setName(s.name);
     setDescription(s.description);
-    setSelectedMascot(s.avatarKey);
+    setSelectedShape(s.shape);
     setSelectedColor(s.colorHex);
   };
 
@@ -142,43 +121,37 @@ export const BotCreatorView: React.FC = () => {
   };
 
   return (
-    <div className="flex-1 flex flex-col h-screen bg-white dark:bg-surface-950 text-slate-800 dark:text-slate-100 overflow-y-auto font-sans transition-colors duration-200">
-      {/* Top Header */}
-      <div className="h-14 border-b border-slate-200 dark:border-surface-800 px-8 flex items-center justify-between bg-slate-50/60 dark:bg-surface-900/60 backdrop-blur-md sticky top-0 z-20">
+    <div className="flex-1 flex flex-col h-screen bg-white dark:bg-[#0f1117] text-slate-800 dark:text-slate-100 overflow-y-auto font-sans select-none">
+      {/* Top Header Matching Screenshot */}
+      <div className="h-14 border-b border-slate-200/80 dark:border-slate-800/80 px-8 flex items-center justify-between bg-white/70 dark:bg-[#0f1117]/70 backdrop-blur-md sticky top-0 z-20">
         <div className="flex items-center space-x-2.5">
-          <div
-            className="w-5 h-5 rounded-full flex items-center justify-center text-white"
-            style={{ backgroundColor: selectedColor }}
-          >
-            <Bot size={12} />
-          </div>
-          <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+          <BotAvatar shape={selectedShape} color={selectedColor} size={22} />
+          <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">
             {name.trim() || 'New Bot'}
           </span>
         </div>
       </div>
 
-      {/* Main Studio Body */}
-      <div className="flex-1 max-w-2xl w-full mx-auto px-6 py-8 flex flex-col items-center space-y-6">
-        {/* Large Mascot Circle Preview */}
-        <div className="relative group">
+      {/* Main Studio Body Matching Screenshot Layout */}
+      <div className="flex-1 max-w-xl w-full mx-auto px-6 py-10 flex flex-col items-center space-y-7">
+        {/* Large Central Mascot Circle Preview */}
+        <div className="relative group transition-transform duration-300 hover:scale-105">
           <div
-            className="w-32 h-32 rounded-full flex items-center justify-center p-3 transition-all duration-300 shadow-xl"
+            className="w-28 h-28 rounded-full flex items-center justify-center p-2 transition-all duration-300"
             style={{
-              backgroundColor: selectedColor,
-              boxShadow: `0 12px 30px ${selectedColor}40`,
+              filter: `drop-shadow(0 14px 28px ${selectedColor}35)`,
             }}
           >
-            <WorkerAvatar
-              type={selectedMascot}
-              size="xl"
-              showGlow={false}
-              className="filter drop-shadow-md select-none transform transition hover:scale-110"
+            <BotAvatar
+              shape={selectedShape}
+              color={selectedColor}
+              size={100}
+              className="transform transition-transform hover:scale-105"
             />
           </div>
         </div>
 
-        {/* 10-Color Palette Swatches */}
+        {/* 10-Color Palette Swatches with Outer Selection Ring */}
         <div className="flex items-center justify-center space-x-2.5 pt-1">
           {PALETTE_COLORS.map((c) => {
             const isSelected = selectedColor === c.hex;
@@ -187,76 +160,77 @@ export const BotCreatorView: React.FC = () => {
                 key={c.hex}
                 type="button"
                 onClick={() => setSelectedColor(c.hex)}
-                className={`w-6 h-6 rounded-full transition-transform duration-200 cursor-pointer flex items-center justify-center ${
+                className={`relative w-6 h-6 rounded-full transition-all duration-150 cursor-pointer flex items-center justify-center ${
                   isSelected
-                    ? 'ring-2 ring-offset-2 ring-cyan-500 scale-125 dark:ring-offset-surface-950 shadow-md'
-                    : 'hover:scale-115 opacity-90 hover:opacity-100'
+                    ? 'ring-2 ring-offset-2 ring-blue-500 dark:ring-offset-[#0f1117] scale-110 shadow-sm'
+                    : 'hover:scale-110 opacity-90 hover:opacity-100'
                 }`}
                 style={{ backgroundColor: c.hex }}
                 title={c.name}
-              >
-                {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-white shadow-xs" />}
-              </button>
+              />
             );
           })}
         </div>
 
-        {/* 10-Mascot Shape Selector */}
-        <div className="flex items-center justify-center space-x-2 overflow-x-auto py-2 px-1 max-w-full">
-          {MASCOT_KEYS.map((k) => {
-            const isSelected = selectedMascot === k;
+        {/* Row of 8 Cute Mascot Shapes with Cute White Eyes */}
+        <div className="flex items-center justify-center space-x-2 pt-1 pb-1">
+          {BOT_SHAPES.map((shape) => {
+            const isSelected = selectedShape === shape.key;
             return (
               <button
-                key={k}
+                key={shape.key}
                 type="button"
-                onClick={() => setSelectedMascot(k)}
-                className={`p-1.5 rounded-xl border transition-all duration-200 ${
+                onClick={() => setSelectedShape(shape.key)}
+                className={`p-2 rounded-xl transition-all duration-150 cursor-pointer flex items-center justify-center ${
                   isSelected
-                    ? 'border-cyan-500 bg-cyan-500/10 shadow-sm ring-2 ring-cyan-500/40 scale-110'
-                    : 'border-slate-200 dark:border-surface-800 hover:border-slate-300 dark:hover:border-surface-700 bg-slate-100/60 dark:bg-surface-900/40'
+                    ? 'ring-2 ring-blue-500 bg-blue-500/10 shadow-xs'
+                    : 'hover:bg-slate-100 dark:hover:bg-slate-800/60'
                 }`}
-                title={`Select ${k} mascot`}
+                title={shape.name}
               >
-                <WorkerAvatar type={k} size="sm" showGlow={false} />
+                <BotAvatar shape={shape.key} color={selectedColor} size={26} />
               </button>
             );
           })}
         </div>
 
-        {/* Form Inputs */}
-        <form onSubmit={handleCreate} className="w-full space-y-4 pt-2">
+        {/* Bot Name Form */}
+        <form onSubmit={handleCreate} className="w-full max-w-md space-y-5 pt-1">
           <div className="space-y-1.5 text-left">
-            <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">Name</label>
+            <label className="text-xs font-medium text-slate-500 dark:text-slate-400 pl-1">
+              Name
+            </label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="New Bot"
-              className="w-full px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-surface-900 border border-slate-200 dark:border-surface-750 text-sm text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition"
+              className="w-full px-4 py-2.5 rounded-xl bg-slate-50/70 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 text-sm text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition"
               autoFocus
             />
           </div>
 
+          {/* Optional Instructions */}
           <div className="space-y-1.5 text-left">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                Instructions or Requirements (Optional)
+            <div className="flex items-center justify-between pl-1">
+              <label className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                Instructions or Mission (Optional)
               </label>
               <button
                 type="button"
                 onClick={handleAiSynthesis}
                 disabled={isAiGenerating || (!description.trim() && !name.trim())}
-                className="text-[11px] text-cyan-600 dark:text-cyan-400 hover:underline flex items-center space-x-1 font-semibold disabled:opacity-40"
+                className="text-[11px] text-blue-600 dark:text-blue-400 hover:underline flex items-center space-x-1 font-semibold disabled:opacity-40"
               >
                 {isAiGenerating ? (
                   <>
-                    <Loader2 size={12} className="animate-spin" />
-                    <span>Main Agent Synthesizing...</span>
+                    <Loader2 size={11} className="animate-spin" />
+                    <span>Synthesizing...</span>
                   </>
                 ) : (
                   <>
-                    <Sparkles size={12} />
-                    <span>Auto-Generate with Main Agent</span>
+                    <Sparkles size={11} />
+                    <span>Auto-Design with Main Agent</span>
                   </>
                 )}
               </button>
@@ -264,57 +238,54 @@ export const BotCreatorView: React.FC = () => {
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="What should this bot do for you? E.g., 'Draft technical YouTube scripts' or 'Monitor my emails overnight'..."
+              placeholder="What should this bot do? E.g., 'Draft technical YouTube scripts' or 'Monitor emails overnight'..."
               rows={2}
-              className="w-full px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-surface-900 border border-slate-200 dark:border-surface-750 text-sm text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition resize-none font-sans"
+              className="w-full px-4 py-2.5 rounded-xl bg-slate-50/70 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 text-sm text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition resize-none font-sans"
             />
           </div>
 
-          {/* Action Button: Get started */}
+          {/* "Get started" Pill Button Matching Screenshot */}
           <div className="pt-2 flex justify-center">
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-8 py-2.5 rounded-xl font-semibold text-sm transition shadow-md disabled:opacity-50 text-white flex items-center space-x-2"
+              className="px-7 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 shadow-sm cursor-pointer disabled:opacity-50 text-white flex items-center space-x-2"
               style={{ backgroundColor: selectedColor }}
             >
               {isSubmitting ? (
                 <>
-                  <Loader2 size={16} className="animate-spin" />
+                  <Loader2 size={15} className="animate-spin" />
                   <span>Creating Bot...</span>
                 </>
               ) : (
                 <>
                   <span>Get started</span>
-                  <ArrowRight size={15} />
+                  <ArrowRight size={14} />
                 </>
               )}
             </button>
           </div>
         </form>
 
-        {/* Suggestions Section */}
-        <div className="w-full pt-6 text-left space-y-3">
-          <div className="text-xs font-bold text-slate-400 dark:text-slate-400 uppercase tracking-wider px-1">
+        {/* Suggestions Section Matching Screenshot Cards */}
+        <div className="w-full max-w-md pt-6 text-left space-y-3">
+          <div className="text-xs font-semibold text-slate-400 dark:text-slate-400 uppercase tracking-wider pl-1">
             Suggestions
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-            {SUGGESTIONS.map((s) => (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            {PRESET_SUGGESTIONS.map((s) => (
               <div
                 key={s.name}
                 onClick={() => handleApplySuggestion(s)}
-                className="p-4 rounded-2xl bg-slate-50/80 dark:bg-surface-900/80 border border-slate-200/80 dark:border-surface-800 hover:border-slate-300 dark:hover:border-surface-700 hover:shadow-md transition-all duration-200 cursor-pointer flex items-center space-x-3.5 group"
+                className="p-4 rounded-2xl bg-white dark:bg-slate-900/50 border border-slate-200/80 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 hover:shadow-md transition-all duration-200 cursor-pointer flex items-center space-x-3.5 group"
               >
-                <div
-                  className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 p-1.5 transition-transform group-hover:scale-105"
-                  style={{ backgroundColor: s.colorHex }}
-                >
-                  <WorkerAvatar type={s.avatarKey} size="sm" showGlow={false} />
+                <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-105">
+                  <BotAvatar shape={s.shape} color={s.colorHex} size={38} />
                 </div>
 
-                <div className="space-y-0.5">
-                  <div className="text-sm font-bold text-slate-800 dark:text-slate-200 group-hover:text-cyan-600 dark:group-hover:text-cyan-400 transition">
+                <div className="space-y-0.5 truncate">
+                  <div className="text-sm font-semibold text-slate-800 dark:text-slate-200 group-hover:text-blue-500 transition truncate">
                     {s.name}
                   </div>
                   <div className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">

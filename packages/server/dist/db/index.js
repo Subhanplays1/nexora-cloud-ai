@@ -14,6 +14,7 @@ class SQLiteDatabaseService {
       CREATE TABLE IF NOT EXISTS conversations (
         id TEXT PRIMARY KEY,
         title TEXT NOT NULL,
+        agent_id TEXT DEFAULT 'main-orchestrator',
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       );
@@ -118,12 +119,21 @@ class SQLiteDatabaseService {
         updated_at TEXT NOT NULL
       );
     `);
+        try {
+            this.db.exec("ALTER TABLE conversations ADD COLUMN agent_id TEXT DEFAULT 'main-orchestrator'");
+        }
+        catch {
+            // Column already exists
+        }
     }
-    async listConversations() {
-        const rows = this.db.prepare('SELECT * FROM conversations ORDER BY updated_at DESC').all();
+    async listConversations(agentId) {
+        const rows = agentId
+            ? this.db.prepare('SELECT * FROM conversations WHERE agent_id = ? ORDER BY updated_at DESC').all(agentId)
+            : this.db.prepare('SELECT * FROM conversations ORDER BY updated_at DESC').all();
         return rows.map((r) => ({
             id: r.id,
             title: r.title,
+            agentId: r.agent_id || 'main-orchestrator',
             createdAt: r.created_at,
             updatedAt: r.updated_at,
             messages: [],
@@ -137,19 +147,21 @@ class SQLiteDatabaseService {
         return {
             id: conv.id,
             title: conv.title,
+            agentId: conv.agent_id || 'main-orchestrator',
             createdAt: conv.created_at,
             updatedAt: conv.updated_at,
             messages,
             lastMessageSnippet: messages[messages.length - 1]?.content.slice(0, 80),
         };
     }
-    async createConversation(title = 'New Task Chat') {
+    async createConversation(title = 'New Task Chat', agentId = 'main-orchestrator') {
         const now = new Date().toISOString();
         const id = uuidv4();
-        this.db.prepare('INSERT INTO conversations (id, title, created_at, updated_at) VALUES (?, ?, ?, ?)').run(id, title, now, now);
+        this.db.prepare('INSERT INTO conversations (id, title, agent_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?)').run(id, title, agentId, now, now);
         return {
             id,
             title,
+            agentId,
             createdAt: now,
             updatedAt: now,
             messages: [],
@@ -623,9 +635,11 @@ class PostgresDatabaseService {
       CREATE TABLE IF NOT EXISTS conversations (
         id VARCHAR(64) PRIMARY KEY,
         title TEXT NOT NULL,
+        agent_id VARCHAR(64) DEFAULT 'main-orchestrator',
         created_at TIMESTAMPTZ NOT NULL,
         updated_at TIMESTAMPTZ NOT NULL
       );
+      ALTER TABLE conversations ADD COLUMN IF NOT EXISTS agent_id VARCHAR(64) DEFAULT 'main-orchestrator';
 
       CREATE TABLE IF NOT EXISTS messages (
         id VARCHAR(64) PRIMARY KEY,
@@ -730,11 +744,15 @@ class PostgresDatabaseService {
     }
     // Postgres proxy fallback methods forwarding to sqlite schema or pool queries
     // For production VPS, the pool is active.
-    async listConversations() {
-        const res = await this.pool.query('SELECT * FROM conversations ORDER BY updated_at DESC');
+    async listConversations(agentId) {
+        const query = agentId
+            ? 'SELECT * FROM conversations WHERE agent_id = $1 ORDER BY updated_at DESC'
+            : 'SELECT * FROM conversations ORDER BY updated_at DESC';
+        const res = agentId ? await this.pool.query(query, [agentId]) : await this.pool.query(query);
         return res.rows.map((r) => ({
             id: r.id,
             title: r.title,
+            agentId: r.agent_id || 'main-orchestrator',
             createdAt: r.created_at.toISOString(),
             updatedAt: r.updated_at.toISOString(),
             messages: [],
@@ -749,17 +767,18 @@ class PostgresDatabaseService {
         return {
             id: conv.id,
             title: conv.title,
+            agentId: conv.agent_id || 'main-orchestrator',
             createdAt: conv.created_at.toISOString(),
             updatedAt: conv.updated_at.toISOString(),
             messages,
             lastMessageSnippet: messages[messages.length - 1]?.content.slice(0, 80),
         };
     }
-    async createConversation(title = 'New Task Chat') {
+    async createConversation(title = 'New Task Chat', agentId = 'main-orchestrator') {
         const now = new Date();
         const id = uuidv4();
-        await this.pool.query('INSERT INTO conversations (id, title, created_at, updated_at) VALUES ($1, $2, $3, $4)', [id, title, now, now]);
-        return { id, title, createdAt: now.toISOString(), updatedAt: now.toISOString(), messages: [] };
+        await this.pool.query('INSERT INTO conversations (id, title, agent_id, created_at, updated_at) VALUES ($1, $2, $3, $4, $5)', [id, title, agentId, now, now]);
+        return { id, title, agentId, createdAt: now.toISOString(), updatedAt: now.toISOString(), messages: [] };
     }
     async deleteConversation(id) {
         await this.pool.query('DELETE FROM messages WHERE conversation_id = $1', [id]);

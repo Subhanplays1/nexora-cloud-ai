@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { WorkerAvatar } from './common/WorkerAvatar';
+import { BotAvatar } from './common/BotAvatar';
 
 export const Sidebar: React.FC = () => {
   const {
@@ -40,12 +41,12 @@ export const Sidebar: React.FC = () => {
 
   return (
     <aside
-      className={`h-screen flex flex-col bg-slate-100/90 dark:bg-surface-900 border-r border-slate-200 dark:border-surface-750 transition-all duration-300 font-sans select-none ${
-        collapsed ? 'w-20' : 'w-72'
+      className={`h-screen flex flex-col bg-slate-100/90 dark:bg-[#0c0e14] border-r border-slate-200 dark:border-slate-800/80 transition-all duration-300 font-sans select-none ${
+        collapsed ? 'w-20' : 'w-68'
       }`}
     >
       {/* Top Header with macOS Window Controls */}
-      <div className="p-4 flex items-center justify-between border-b border-slate-200/60 dark:border-surface-800">
+      <div className="p-4 flex items-center justify-between border-b border-slate-200/60 dark:border-slate-800/60">
         <div className="flex items-center space-x-2">
           {/* macOS window dots */}
           <span className="w-3 h-3 rounded-full bg-[#FF5F56] border border-[#E0443E] shadow-xs inline-block" />
@@ -55,7 +56,7 @@ export const Sidebar: React.FC = () => {
 
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white transition"
+          className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white transition cursor-pointer"
           title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         >
           {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
@@ -66,16 +67,14 @@ export const Sidebar: React.FC = () => {
       <div className="p-3">
         <button
           onClick={() => setActiveTab('CREATE_BOT')}
-          className={`w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-2xl transition-all duration-200 shadow-sm cursor-pointer ${
+          className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-2xl transition-all duration-200 shadow-xs cursor-pointer ${
             activeTab === 'CREATE_BOT'
-              ? 'bg-slate-200 dark:bg-surface-800 text-slate-900 dark:text-white font-bold ring-2 ring-cyan-500/30'
-              : 'bg-slate-200/70 dark:bg-surface-850 hover:bg-slate-200 dark:hover:bg-surface-800 text-slate-700 dark:text-slate-200 font-semibold'
+              ? 'bg-slate-200 dark:bg-slate-800 text-slate-900 dark:text-white font-semibold ring-2 ring-blue-500/30'
+              : 'bg-slate-200/60 dark:bg-slate-850 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 font-medium'
           } ${collapsed ? 'justify-center px-0' : ''}`}
           title="Create a new autonomous Bot"
         >
-          <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white flex-shrink-0 shadow-sm">
-            <Plus size={16} />
-          </div>
+          <BotAvatar shape="circle" color="#3B82F6" size={28} />
           {!collapsed && (
             <span className="text-sm truncate">
               {customAgents.length === 0 ? 'Create your first Bot' : 'Create New Bot'}
@@ -91,21 +90,20 @@ export const Sidebar: React.FC = () => {
             onClick={() => setActiveAgentId(mainAgent.id)}
             className={`flex items-center space-x-3 px-3 py-2 rounded-2xl cursor-pointer transition ${
               activeAgentId === mainAgent.id && activeTab === 'CHAT'
-                ? 'bg-cyan-500/15 border border-cyan-500/40 text-cyan-600 dark:text-cyan-300 font-bold shadow-sm'
-                : 'hover:bg-slate-200/50 dark:hover:bg-surface-850 text-slate-700 dark:text-slate-300'
+                ? 'bg-blue-500/10 border border-blue-500/30 text-blue-600 dark:text-blue-300 font-bold shadow-xs'
+                : 'hover:bg-slate-200/50 dark:hover:bg-slate-850 text-slate-700 dark:text-slate-300'
             }`}
           >
-            <div
-              className="w-8 h-8 rounded-full flex items-center justify-center p-0.5 text-white flex-shrink-0 shadow-xs"
-              style={{ backgroundColor: mainAgent.colorHex || '#3B82F6' }}
-            >
-              <WorkerAvatar type={mainAgent.avatarKey} size="xs" showGlow={false} />
-            </div>
+            <BotAvatar
+              shape={mainAgent.avatarKey || 'circle'}
+              color={mainAgent.colorHex || '#3B82F6'}
+              size={28}
+            />
 
             <div className="flex-1 truncate text-left">
               <div className="text-xs font-bold leading-tight flex items-center space-x-1.5">
                 <span>{mainAgent.name}</span>
-                <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-cyan-500/20 text-cyan-500 font-mono font-bold">
+                <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-blue-500/15 text-blue-500 font-mono font-bold">
                   MAIN
                 </span>
               </div>
@@ -119,7 +117,7 @@ export const Sidebar: React.FC = () => {
       <div className="flex-1 overflow-y-auto px-3 py-1 space-y-1">
         {!collapsed && customAgents.length > 0 && (
           <div className="text-[10px] font-bold text-slate-400 dark:text-slate-400 uppercase tracking-wider px-2 pt-2 pb-1">
-            Your Custom Bots ({customAgents.length})
+            Your Bots ({customAgents.length})
           </div>
         )}
 
@@ -132,18 +130,17 @@ export const Sidebar: React.FC = () => {
               onClick={() => setActiveAgentId(bot.id)}
               className={`group flex items-center justify-between px-3 py-2 rounded-2xl cursor-pointer transition ${
                 isSelected
-                  ? 'bg-slate-200 dark:bg-surface-800 text-slate-900 dark:text-white font-bold shadow-sm ring-1 ring-cyan-500/40'
-                  : 'hover:bg-slate-200/60 dark:hover:bg-surface-850 text-slate-700 dark:text-slate-300'
+                  ? 'bg-slate-200 dark:bg-slate-800 text-slate-900 dark:text-white font-bold shadow-xs ring-1 ring-blue-500/40'
+                  : 'hover:bg-slate-200/60 dark:hover:bg-slate-850 text-slate-700 dark:text-slate-300'
               } ${collapsed ? 'justify-center px-0' : ''}`}
               title={`${bot.name}: ${bot.description}`}
             >
               <div className="flex items-center space-x-3 truncate">
-                <div
-                  className="w-8 h-8 rounded-full flex items-center justify-center p-0.5 text-white flex-shrink-0 shadow-xs"
-                  style={{ backgroundColor: bot.colorHex }}
-                >
-                  <WorkerAvatar type={bot.avatarKey} size="xs" showGlow={false} />
-                </div>
+                <BotAvatar
+                  shape={bot.avatarKey}
+                  color={bot.colorHex}
+                  size={28}
+                />
 
                 {!collapsed && (
                   <div className="truncate text-left">

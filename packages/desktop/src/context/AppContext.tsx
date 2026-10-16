@@ -24,8 +24,9 @@ interface AppContextType {
   activeTab: NavTab;
   setActiveTab: (tab: NavTab) => void;
   conversations: Conversation[];
+  agentConversations: Conversation[];
   activeConversationId: string | null;
-  setActiveConversationId: (id: string) => void;
+  setActiveConversationId: (id: string | null) => void;
   messages: ChatMessage[];
   tasks: Task[];
   activeTaskId: string | null;
@@ -103,9 +104,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem('nexora_active_agent_id', id);
     setActiveAgentIdState(id);
     setActiveTab('CHAT');
+    // Immediately clear messages so old bot chat is never shown or flashes
+    setMessages([]);
+
+    const matchingConv = conversations.find(
+      (c) => (c.agentId || 'main-orchestrator') === id
+    );
+
+    if (matchingConv) {
+      setActiveConversationId(matchingConv.id);
+      apiFetch(`/api/conversations/${matchingConv.id}`)
+        .then((conv) => {
+          setMessages(conv.messages || []);
+        })
+        .catch(() => {});
+    } else {
+      setActiveConversationId(null);
+    }
   };
 
   const activeAgent = agents.find((a) => a.id === activeAgentId) || agents[0] || null;
+
+  // Conversations filtered for the active agent
+  const agentConversations = conversations.filter(
+    (c) => (c.agentId || 'main-orchestrator') === (activeAgentId || 'main-orchestrator')
+  );
 
   // Helper fetch with timeout
   const apiFetch = useCallback(
@@ -161,13 +184,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const agentList: CustomAgent[] = agentResp.agents || [];
       setAgents(agentList);
 
+      const currentAgentId = activeAgentId || (agentList.length > 0 ? agentList[0].id : 'main-orchestrator');
+
       if (agentList.length > 0 && (!activeAgentId || !agentList.some((a) => a.id === activeAgentId))) {
         setActiveAgentIdState(agentList[0].id);
       }
 
-      if (convList.length > 0 && !activeConversationId) {
-        setActiveConversationId(convList[0].id);
+      // Select conversation corresponding to active agent
+      const agentConvs = convList.filter(
+        (c: Conversation) => (c.agentId || 'main-orchestrator') === currentAgentId
+      );
+
+      if (agentConvs.length > 0) {
+        if (!activeConversationId || !agentConvs.some((c: Conversation) => c.id === activeConversationId)) {
+          setActiveConversationId(agentConvs[0].id);
+        }
+      } else {
+        if (!activeConversationId || !convList.some((c: Conversation) => c.id === activeConversationId && (c.agentId || 'main-orchestrator') === currentAgentId)) {
+          setActiveConversationId(null);
+          setMessages([]);
+        }
       }
+
       if (taskList.length > 0 && !activeTaskId) {
         setActiveTaskId(taskList[0].id);
       }
@@ -386,8 +424,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const deleteAgent = async (id: string) => {
     await apiFetch(`/api/agents/${id}`, { method: 'DELETE' });
     setAgents((prev) => prev.filter((a) => a.id !== id));
+    setConversations((prev) => prev.filter((c) => (c.agentId || 'main-orchestrator') !== id));
     if (activeAgentId === id) {
-      setActiveAgentIdState('main-orchestrator');
+      setActiveAgentId('main-orchestrator');
     }
   };
 
@@ -413,9 +452,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const createNewConversation = async () => {
     try {
+      const currentAgentId = activeAgentId || 'main-orchestrator';
       const conv = await apiFetch('/api/conversations', {
         method: 'POST',
-        body: JSON.stringify({ title: 'New Chat' }),
+        body: JSON.stringify({ title: 'New Chat', agentId: currentAgentId }),
       });
       setConversations((prev) => [conv, ...prev]);
       setActiveConversationId(conv.id);
@@ -430,8 +470,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     await apiFetch(`/api/conversations/${id}`, { method: 'DELETE' });
     setConversations((prev) => prev.filter((c) => c.id !== id));
     if (activeConversationId === id) {
-      const remaining = conversations.filter((c) => c.id !== id);
-      setActiveConversationId(remaining.length > 0 ? remaining[0].id : null);
+      const currentAgentId = activeAgentId || 'main-orchestrator';
+      const remainingForAgent = conversations.filter(
+        (c) => c.id !== id && (c.agentId || 'main-orchestrator') === currentAgentId
+      );
+      setActiveConversationId(remainingForAgent.length > 0 ? remainingForAgent[0].id : null);
+      if (remainingForAgent.length === 0) setMessages([]);
     }
   };
 
@@ -441,11 +485,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     try {
       let targetConvId = activeConversationId;
+      const currentAgentId = activeAgent?.id || activeAgentId || 'main-orchestrator';
+
       if (!targetConvId) {
         const titleSnippet = text.length > 30 ? text.slice(0, 30) + '...' : text;
         const newConv = await apiFetch('/api/conversations', {
           method: 'POST',
-          body: JSON.stringify({ title: titleSnippet }),
+          body: JSON.stringify({ title: titleSnippet, agentId: currentAgentId }),
         });
         setConversations((prev) => [newConv, ...prev]);
         targetConvId = newConv.id;
@@ -585,6 +631,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         activeTab,
         setActiveTab,
         conversations,
+        agentConversations,
         activeConversationId,
         setActiveConversationId,
         messages,

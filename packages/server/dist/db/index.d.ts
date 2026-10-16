@@ -1,9 +1,9 @@
 import { Task, TaskStep, ChatMessage, Conversation, ApprovalRequest, Artifact, CustomAgent, AgentMemory } from '@nexora/shared';
 export interface DatabaseService {
     init(): Promise<void>;
-    listConversations(): Promise<Conversation[]>;
+    listConversations(agentId?: string): Promise<Conversation[]>;
     getConversation(id: string): Promise<Conversation | null>;
-    createConversation(title?: string): Promise<Conversation>;
+    createConversation(title?: string, agentId?: string): Promise<Conversation>;
     deleteConversation(id: string): Promise<void>;
     listMessages(conversationId: string): Promise<ChatMessage[]>;
     createMessage(msg: Omit<ChatMessage, 'id' | 'createdAt'>): Promise<ChatMessage>;

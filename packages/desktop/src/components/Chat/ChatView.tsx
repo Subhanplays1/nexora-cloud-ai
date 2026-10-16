@@ -13,14 +13,16 @@ import {
   Monitor,
   CheckCircle2,
   Loader2,
+  Plus,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
-import { WorkerAvatar } from '../common/WorkerAvatar';
+import { BotAvatar } from '../common/BotAvatar';
 
 export const ChatView: React.FC = () => {
   const {
     messages,
     sendMessage,
+    createNewConversation,
     setActiveTab,
     setActiveTaskId,
     tasks,
@@ -106,25 +108,20 @@ export const ChatView: React.FC = () => {
       {/* Top Banner with Active Bot Mascot & Memory Inspector Button */}
       <div className="h-14 border-b border-slate-200 dark:border-surface-800 px-6 flex items-center justify-between bg-slate-50/60 dark:bg-surface-900/50 backdrop-blur-md">
         <div className="flex items-center space-x-3">
-          <div
-            className="w-8 h-8 rounded-full flex items-center justify-center p-0.5 text-white shadow-xs"
-            style={{ backgroundColor: currentAgent?.colorHex || '#3B82F6' }}
-          >
-            <WorkerAvatar
-              type={currentAgent?.avatarKey || 'orchestrator'}
-              size="xs"
-              showGlow={false}
-            />
-          </div>
+          <BotAvatar
+            shape={currentAgent?.avatarKey || 'circle'}
+            color={currentAgent?.colorHex || '#3B82F6'}
+            size={32}
+          />
           <div>
             <h1 className="text-sm font-bold text-slate-800 dark:text-white flex items-center space-x-2">
               <span>{currentAgent?.name || 'Nexora Brain'}</span>
               {currentAgent?.isMainAgent ? (
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-500 border border-cyan-500/30 font-semibold">
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-500 border border-blue-500/30 font-semibold">
                   Main Orchestrator
                 </span>
               ) : (
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-200 dark:bg-surface-800 text-slate-600 dark:text-slate-300 font-medium">
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-medium">
                   Custom Bot
                 </span>
               )}
@@ -135,8 +132,17 @@ export const ChatView: React.FC = () => {
           </div>
         </div>
 
-        {/* Header Action Buttons: Memory & Live Sandbox */}
+        {/* Header Action Buttons: New Chat, Memory & Live Sandbox */}
         <div className="flex items-center space-x-2">
+          <button
+            onClick={() => createNewConversation()}
+            className="flex items-center space-x-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 transition shadow-xs cursor-pointer"
+            title="Start a new chat with this bot"
+          >
+            <Plus size={13} />
+            <span>New Chat</span>
+          </button>
+
           <button
             onClick={() => setIsMemoryModalOpen(true)}
             className="flex items-center space-x-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 border border-indigo-500/30 transition shadow-xs cursor-pointer"
@@ -151,7 +157,7 @@ export const ChatView: React.FC = () => {
 
           <button
             onClick={() => setActiveTab('LIVE_ACTIVITY')}
-            className="flex items-center space-x-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl bg-slate-200 dark:bg-surface-800 hover:bg-slate-300 dark:hover:bg-surface-750 text-slate-700 dark:text-cyan-400 border border-slate-300 dark:border-surface-700 transition shadow-xs cursor-pointer"
+            className="flex items-center space-x-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 transition shadow-xs cursor-pointer"
           >
             <Monitor size={14} />
             <span>Live Sandbox</span>
@@ -165,16 +171,15 @@ export const ChatView: React.FC = () => {
           <div className="max-w-2xl mx-auto mt-8 text-center space-y-6">
             <div className="flex justify-center">
               <div
-                className="w-24 h-24 rounded-full flex items-center justify-center p-2.5 shadow-xl transition-transform hover:scale-105"
+                className="w-24 h-24 rounded-full flex items-center justify-center p-2 transition-transform hover:scale-105"
                 style={{
-                  backgroundColor: currentAgent?.colorHex || '#3B82F6',
-                  boxShadow: `0 10px 25px ${currentAgent?.colorHex || '#3B82F6'}40`,
+                  filter: `drop-shadow(0 12px 24px ${currentAgent?.colorHex || '#3B82F6'}40)`,
                 }}
               >
-                <WorkerAvatar
-                  type={currentAgent?.avatarKey || 'orchestrator'}
-                  size="lg"
-                  showGlow={false}
+                <BotAvatar
+                  shape={currentAgent?.avatarKey || 'circle'}
+                  color={currentAgent?.colorHex || '#3B82F6'}
+                  size={88}
                 />
               </div>
             </div>
@@ -313,16 +318,11 @@ export const ChatView: React.FC = () => {
                     SZ
                   </div>
                 ) : (
-                  <div
-                    className="w-8 h-8 rounded-full flex items-center justify-center p-0.5 text-white flex-shrink-0 shadow-xs"
-                    style={{ backgroundColor: currentAgent?.colorHex || '#3B82F6' }}
-                  >
-                    <WorkerAvatar
-                      type={currentAgent?.avatarKey || 'orchestrator'}
-                      size="xs"
-                      showGlow={false}
-                    />
-                  </div>
+                  <BotAvatar
+                    shape={currentAgent?.avatarKey || 'circle'}
+                    color={currentAgent?.colorHex || '#3B82F6'}
+                    size={30}
+                  />
                 )}
 
                 <div className="flex-1 space-y-1.5">

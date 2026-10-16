@@ -4,14 +4,15 @@ import { orchestrator } from '../orchestrator/gemini.js';
 import { taskQueue } from '../queue/index.js';
 import { wsGateway } from '../websocket/index.js';
 export async function conversationRoutes(fastify) {
-    // List all conversations
-    fastify.get('/api/conversations', async () => {
-        return db.listConversations();
+    // List conversations (optionally filtered by agentId)
+    fastify.get('/api/conversations', async (req) => {
+        return db.listConversations(req.query.agentId);
     });
-    // Create new conversation
+    // Create new conversation for a specific agent
     fastify.post('/api/conversations', async (req) => {
         const title = req.body?.title || 'New Task Session';
-        return db.createConversation(title);
+        const agentId = req.body?.agentId || 'main-orchestrator';
+        return db.createConversation(title, agentId);
     });
     // Get specific conversation with full messages
     fastify.get('/api/conversations/:id', async (req, reply) => {
@@ -28,10 +29,12 @@ export async function conversationRoutes(fastify) {
     });
     // Post message to conversation (initiates AI reasoning, agent memory lookup, & autonomous planning)
     fastify.post('/api/conversations/:id/messages', async (req) => {
-        const { content, executeAsTask = true, agentId = 'main-orchestrator' } = req.body;
+        const { content, executeAsTask = true, agentId } = req.body;
         const conversationId = req.params.id;
-        // 1. Fetch the active agent and its persistent memory
-        const activeAgent = (await db.getAgent(agentId)) || (await db.getAgent('main-orchestrator'));
+        // 1. Fetch conversation and active agent
+        const conv = await db.getConversation(conversationId);
+        const effectiveAgentId = agentId || conv?.agentId || 'main-orchestrator';
+        const activeAgent = (await db.getAgent(effectiveAgentId)) || (await db.getAgent('main-orchestrator'));
         // 2. Save user message
         const userMsg = await db.createMessage({
             conversationId,

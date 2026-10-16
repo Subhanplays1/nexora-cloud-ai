@@ -9,6 +9,7 @@ export interface Attachment {
 export interface ChatMessage {
     id: string;
     conversationId: string;
+    agentId?: string;
     role: MessageRole;
     content: string;
     attachments?: Attachment[];
@@ -20,6 +21,7 @@ export interface ChatMessage {
 export interface Conversation {
     id: string;
     title: string;
+    agentId?: string;
     createdAt: string;
     updatedAt: string;
     messages: ChatMessage[];
