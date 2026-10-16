@@ -92,6 +92,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isMemoryModalOpen, setIsMemoryModalOpen] = useState(false);
 
   const wsRef = useRef<WebSocket | null>(null);
+  const skipNextMessageLoadRef = useRef<string | null>(null);
 
   const setBackendUrl = (url: string) => {
     localStorage.setItem('nexora_backend_url', url);
@@ -110,15 +111,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const apiFetch = useCallback(
     async (endpoint: string, options: RequestInit = {}) => {
       const url = `${backendUrl.replace(/\/$/, '')}${endpoint}`;
+      const method = (options.method || 'GET').toUpperCase();
+      const headers: Record<string, string> = {
+        ...(options.headers as Record<string, string> || {}),
+      };
+
+      let body = options.body;
+      if (['POST', 'PUT', 'PATCH'].includes(method)) {
+        headers['Content-Type'] = 'application/json';
+        if (body === undefined || body === null) {
+          body = '{}';
+        }
+      }
+
       const res = await fetch(url, {
         ...options,
-        headers: {
-          'Content-Type': 'application/json',
-          ...(options.headers || {}),
-        },
+        method,
+        headers,
+        body,
       });
+
       if (!res.ok) {
-        throw new Error(`HTTP error ${res.status}: ${res.statusText}`);
+        const errorText = await res.text().catch(() => '');
+        throw new Error(`HTTP error ${res.status}: ${res.statusText} (${errorText})`);
       }
       return res.json();
     },
@@ -164,6 +179,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Load messages whenever activeConversationId changes
   useEffect(() => {
     if (!activeConversationId) return;
+    if (skipNextMessageLoadRef.current === activeConversationId) {
+      skipNextMessageLoadRef.current = null;
+      return;
+    }
     apiFetch(`/api/conversations/${activeConversationId}`)
       .then((conv) => {
         setMessages(conv.messages || []);
@@ -288,10 +307,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const chunk = payload as { messageId: string; chunk: string };
         setMessages((prev) =>
           prev.map((m) => {
-            if (m.id === chunk.messageId) {
+            if (m.id === chunk.messageId || (m.isStreaming && m.role === 'assistant' && m.id.startsWith('temp-ast-'))) {
+              const baseContent = m.id.startsWith('temp-ast-') && (m.content.includes('Thinking...') || m.content.includes('Planning'))
+                ? ''
+                : (m.content || '');
               return {
                 ...m,
-                content: (m.content || '') + chunk.chunk,
+                id: chunk.messageId,
+                content: baseContent + chunk.chunk,
                 isStreaming: true,
               };
             }
@@ -305,9 +328,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const end = payload as { messageId: string; fullContent: string };
         setMessages((prev) =>
           prev.map((m) => {
-            if (m.id === end.messageId) {
+            if (m.id === end.messageId || (m.isStreaming && m.role === 'assistant' && m.id.startsWith('temp-ast-'))) {
               return {
                 ...m,
+                id: end.messageId,
                 content: end.fullContent,
                 isStreaming: false,
                 status: 'SENT',
@@ -388,10 +412,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const createNewConversation = async () => {
-    const conv = await apiFetch('/api/conversations', { method: 'POST' });
-    setConversations((prev) => [conv, ...prev]);
-    setActiveConversationId(conv.id);
-    setMessages([]);
+    try {
+      const conv = await apiFetch('/api/conversations', {
+        method: 'POST',
+        body: JSON.stringify({ title: 'New Chat' }),
+      });
+      setConversations((prev) => [conv, ...prev]);
+      setActiveConversationId(conv.id);
+      setMessages([]);
+      setActiveTab('CHAT');
+    } catch (err) {
+      console.error('[App] Failed to create new conversation:', err);
+    }
   };
 
   const deleteConversation = async (id: string) => {
@@ -404,58 +436,92 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const sendMessage = async (content: string, executeAsTask = true) => {
-    let targetConvId = activeConversationId;
-    if (!targetConvId) {
-      const newConv = await apiFetch('/api/conversations', { method: 'POST' });
-      setConversations((prev) => [newConv, ...prev]);
-      targetConvId = newConv.id;
-      setActiveConversationId(targetConvId);
+    const text = content.trim();
+    if (!text) return;
+
+    try {
+      let targetConvId = activeConversationId;
+      if (!targetConvId) {
+        const titleSnippet = text.length > 30 ? text.slice(0, 30) + '...' : text;
+        const newConv = await apiFetch('/api/conversations', {
+          method: 'POST',
+          body: JSON.stringify({ title: titleSnippet }),
+        });
+        setConversations((prev) => [newConv, ...prev]);
+        targetConvId = newConv.id;
+        skipNextMessageLoadRef.current = targetConvId;
+        setActiveConversationId(targetConvId);
+      }
+
+      const currentAgent = activeAgent;
+
+      // Optimistic user message insertion
+      const tempUserMsg: ChatMessage = {
+        id: 'temp-' + Date.now(),
+        conversationId: targetConvId,
+        role: 'user',
+        content: text,
+        status: 'SENT',
+        createdAt: new Date().toISOString(),
+      };
+
+      const tempAssistantMsg: ChatMessage = {
+        id: 'temp-ast-' + Date.now(),
+        conversationId: targetConvId,
+        role: 'assistant',
+        content: `[${currentAgent?.name || 'Nexora Brain'}] Thinking...`,
+        status: 'STREAMING',
+        isStreaming: true,
+        createdAt: new Date().toISOString(),
+      };
+
+      setMessages((prev) => [...prev, tempUserMsg, tempAssistantMsg]);
+
+      const res = await apiFetch(`/api/conversations/${targetConvId}/messages`, {
+        method: 'POST',
+        body: JSON.stringify({
+          content: text,
+          executeAsTask,
+          agentId: currentAgent?.id || 'main-orchestrator',
+        }),
+      });
+
+      // Replace optimistic ids with actual DB ids while preserving any chunks received
+      if (res && res.userMessage && res.assistantMessage) {
+        setMessages((prev) =>
+          prev.map((m) => {
+            if (m.id === tempUserMsg.id) return res.userMessage;
+            if (m.id === tempAssistantMsg.id) {
+              return {
+                ...res.assistantMessage,
+                content:
+                  m.content && !m.content.includes('Thinking...')
+                    ? m.content
+                    : res.assistantMessage.content,
+                isStreaming: m.isStreaming ?? res.assistantMessage.status === 'STREAMING',
+              };
+            }
+            return m;
+          })
+        );
+      }
+
+      // Refresh tasks and agents to stay in sync
+      setTimeout(refreshAll, 1200);
+    } catch (err: any) {
+      console.error('[App] Failed to send message:', err);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: 'error-' + Date.now(),
+          conversationId: activeConversationId || 'unknown',
+          role: 'assistant',
+          content: `⚠️ Failed to send message: ${err.message || 'Network error'}. Please try again.`,
+          status: 'ERROR',
+          createdAt: new Date().toISOString(),
+        },
+      ]);
     }
-
-    const currentAgent = activeAgent;
-
-    // Optimistic user message insertion
-    const tempUserMsg: ChatMessage = {
-      id: 'temp-' + Date.now(),
-      conversationId: targetConvId,
-      role: 'user',
-      content,
-      status: 'SENT',
-      createdAt: new Date().toISOString(),
-    };
-
-    const tempAssistantMsg: ChatMessage = {
-      id: 'temp-ast-' + Date.now(),
-      conversationId: targetConvId,
-      role: 'assistant',
-      content: `[${currentAgent?.name || 'Nexora Brain'}] Planning autonomous cloud execution...`,
-      status: 'STREAMING',
-      isStreaming: true,
-      createdAt: new Date().toISOString(),
-    };
-
-    setMessages((prev) => [...prev, tempUserMsg, tempAssistantMsg]);
-
-    const res = await apiFetch(`/api/conversations/${targetConvId}/messages`, {
-      method: 'POST',
-      body: JSON.stringify({
-        content,
-        executeAsTask,
-        agentId: currentAgent?.id || 'main-orchestrator',
-      }),
-    });
-
-    // Replace optimistic ids with actual DB ids
-    setMessages((prev) =>
-      prev.map((m) => {
-        if (m.id === tempUserMsg.id) return res.userMessage;
-        if (m.id === tempAssistantMsg.id) return res.assistantMessage;
-        return m;
-      })
-    );
-
-    // Refresh tasks and agents to stay in sync
-    setTimeout(refreshAll, 1200);
   };
 
   const createTaskDirectly = async (prompt: string, priority: 'LOW' | 'NORMAL' | 'HIGH' | 'CRITICAL' = 'NORMAL') => {

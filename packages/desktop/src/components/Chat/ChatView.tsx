@@ -12,6 +12,7 @@ import {
   Brain,
   Monitor,
   CheckCircle2,
+  Loader2,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { WorkerAvatar } from '../common/WorkerAvatar';
@@ -29,6 +30,7 @@ export const ChatView: React.FC = () => {
 
   const [input, setInput] = useState('');
   const [isRecording, setIsRecording] = useState(false);
+  const [isSending, setIsSending] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
@@ -36,11 +38,21 @@ export const ChatView: React.FC = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const handleSubmit = (e?: React.FormEvent) => {
+  const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!input.trim()) return;
-    sendMessage(input.trim(), true);
+    const text = input.trim();
+    if (!text || isSending) return;
+
     setInput('');
+    setIsSending(true);
+    try {
+      await sendMessage(text, true);
+    } catch (err) {
+      console.error('[ChatView] Error submitting message:', err);
+      setInput(text);
+    } finally {
+      setIsSending(false);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -431,12 +443,12 @@ export const ChatView: React.FC = () => {
 
               <button
                 type="submit"
-                disabled={!input.trim()}
-                className="p-2 rounded-xl text-white transition shadow-sm disabled:opacity-40"
+                disabled={!input.trim() || isSending}
+                className="p-2 rounded-xl text-white transition shadow-sm disabled:opacity-40 flex items-center justify-center cursor-pointer"
                 style={{ backgroundColor: currentAgent?.colorHex || '#3B82F6' }}
                 title="Send command"
               >
-                <Send size={16} />
+                {isSending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
               </button>
             </div>
           </div>

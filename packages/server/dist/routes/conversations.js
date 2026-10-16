@@ -108,10 +108,14 @@ Return JSON matching:
                     wsGateway.emitChatStreamEnd(conversationId, assistantMsg.id, replyText);
                     return;
                 }
+                const isExplicitTaskDelegation = Boolean(content.match(/\b(scrape|crawl|ffmpeg|playwright|download|clone|npm install|git commit|execute test|run command)\b/i) ||
+                    content.match(/^(build|scaffold|code|create|generate|produce|render|deploy)\s+(a|an|the|this)?\s*(app|website|script|video|thumbnail|image|docker|pipeline|endpoint)\b/i));
                 const isConversationalQuery = !executeAsTask ||
-                    Boolean(content.match(/^(hi|hello|hey|yo|greetings|hola)\b/i) ||
-                        content.match(/\b(who are you|what are you|who made you|who created you|what is your name|your name|what model|are you gemini|are you google|tell me about yourself|introduce yourself)\b/i) ||
-                        (content.length < 35 && content.trim().endsWith('?')));
+                    !isExplicitTaskDelegation ||
+                    Boolean(content.trim().endsWith('?') ||
+                        content.match(/^(hi|hello|hey|yo|greetings|hola)\b/i) ||
+                        content.match(/^(what|why|how|who|when|where|which|whose|can you|could you|would you|will you|tell me|explain|describe|introduce|help me)\b/i) ||
+                        content.match(/\b(who are you|what are you|who made you|who created you|what is your name|your name|what model|are you gemini|are you google)\b/i));
                 if (!isConversationalQuery && executeAsTask) {
                     // Plan execution with Gemini orchestrator
                     const plan = await orchestrator.planExecution(content);

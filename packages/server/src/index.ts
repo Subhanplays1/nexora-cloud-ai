@@ -36,6 +36,22 @@ async function bootstrap() {
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   });
 
+  // Allow empty JSON bodies without FST_ERR_CTP_EMPTY_JSON_BODY error
+  app.addContentTypeParser('application/json', { parseAs: 'string' }, (req, body: string | Buffer, defaultDone) => {
+    const str = typeof body === 'string' ? body : body.toString('utf-8');
+    if (!str || str.trim() === '') {
+      defaultDone(null, {});
+      return;
+    }
+    try {
+      const json = JSON.parse(str);
+      defaultDone(null, json);
+    } catch (err: any) {
+      err.statusCode = 400;
+      defaultDone(err, undefined);
+    }
+  });
+
   // Serve generated artifacts and screenshots
   await app.register(fastifyStatic, {
     root: config.storageDir,
