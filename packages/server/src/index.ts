@@ -60,6 +60,11 @@ async function bootstrap() {
       root: desktopDist,
       prefix: '/',
       decorateReply: false,
+      index: ['index.html'],
+    });
+
+    app.get('/', async (req, reply) => {
+      return reply.sendFile('index.html', desktopDist!);
     });
 
     app.setNotFoundHandler((req, reply) => {

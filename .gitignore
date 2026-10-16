@@ -1,6 +1,6 @@
 node_modules/
-dist/
-dist-electron/
+!packages/desktop/dist
+!packages/desktop/dist/**
 .env
 data/*.db
 data/*.db-journal
