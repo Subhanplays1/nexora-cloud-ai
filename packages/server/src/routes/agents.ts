@@ -161,7 +161,7 @@ Return ONLY valid JSON matching this schema:
   });
 
   // 8. Update Agent Memory (append/edit facts so bot never forgets)
-  app.post<{ Params: { id: string }; Body: { fact?: string; removeFact?: string; instructions?: string[] } }>(
+  app.post<{ Params: { id: string }; Body: { fact?: string; removeFact?: string; userFacts?: string[]; instructions?: string[] } }>(
     '/api/agents/:id/memory',
     async (req, reply) => {
       const agent = await db.getAgent(req.params.id);
@@ -169,7 +169,7 @@ Return ONLY valid JSON matching this schema:
         return reply.status(404).send({ error: 'Agent not found' });
       }
 
-      let userFacts = [...(agent.memory.userFacts || [])];
+      let userFacts = req.body.userFacts ? [...req.body.userFacts] : [...(agent.memory.userFacts || [])];
       if (req.body.fact && !userFacts.includes(req.body.fact.trim())) {
         userFacts.push(req.body.fact.trim());
       }

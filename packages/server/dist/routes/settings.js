@@ -33,6 +33,7 @@ export async function settingsRoutes(fastify) {
         const { geminiApiKey, geminiModel, integrations, userPreferences } = req.body;
         if (geminiApiKey) {
             orchestrator.updateApiKey(geminiApiKey);
+            await db.setSetting('gemini_api_key', geminiApiKey);
         }
         if (geminiModel) {
             config.geminiModel = geminiModel;

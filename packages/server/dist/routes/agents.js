@@ -149,7 +149,7 @@ Return ONLY valid JSON matching this schema:
         if (!agent) {
             return reply.status(404).send({ error: 'Agent not found' });
         }
-        let userFacts = [...(agent.memory.userFacts || [])];
+        let userFacts = req.body.userFacts ? [...req.body.userFacts] : [...(agent.memory.userFacts || [])];
         if (req.body.fact && !userFacts.includes(req.body.fact.trim())) {
             userFacts.push(req.body.fact.trim());
         }

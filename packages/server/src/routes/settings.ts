@@ -49,6 +49,7 @@ export async function settingsRoutes(fastify: FastifyInstance): Promise<void> {
 
       if (geminiApiKey) {
         orchestrator.updateApiKey(geminiApiKey);
+        await db.setSetting('gemini_api_key', geminiApiKey);
       }
       if (geminiModel) {
         config.geminiModel = geminiModel;

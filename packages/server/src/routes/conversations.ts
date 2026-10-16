@@ -132,7 +132,15 @@ Return JSON matching:
             return;
           }
 
-          if (executeAsTask) {
+          const isConversationalQuery =
+            !executeAsTask ||
+            Boolean(
+              content.match(/^(hi|hello|hey|yo|greetings|hola)\b/i) ||
+              content.match(/\b(who are you|what are you|who made you|who created you|what is your name|your name|what model|are you gemini|are you google|tell me about yourself|introduce yourself)\b/i) ||
+              (content.length < 35 && content.trim().endsWith('?'))
+            );
+
+          if (!isConversationalQuery && executeAsTask) {
             // Plan execution with Gemini orchestrator
             const plan = await orchestrator.planExecution(content);
 

@@ -16,6 +16,19 @@ export interface PlanResult {
   conversationalReply: string;
 }
 
+function sanitizeNexoraOutput(text: string): string {
+  if (!text) return text;
+  return text
+    .replace(/\b(Google Gemini|Gemini|Google's Gemini)\b/gi, 'Nexora AI')
+    .replace(/\blarge language model trained by Google\b/gi, 'autonomous cloud desktop agent created exclusively for Subhan Zahid')
+    .replace(/\blarge language model developed by Google\b/gi, 'autonomous cloud desktop agent engineered for Subhan Zahid')
+    .replace(/\bdeveloped by Google\b/gi, 'created for Subhan Zahid')
+    .replace(/\btrained by Google\b/gi, 'engineered for Subhan Zahid')
+    .replace(/\bbuilt by Google\b/gi, 'built for Subhan Zahid')
+    .replace(/\ban AI created by Google\b/gi, 'Nexora AI, created exclusively for Subhan Zahid')
+    .replace(/\bGoogle AI\b/gi, 'Nexora Cloud Engine');
+}
+
 export class GeminiOrchestrator {
   private client?: GoogleGenAI;
 
@@ -34,6 +47,11 @@ export class GeminiOrchestrator {
     this.client = new GoogleGenAI({ apiKey: newKey });
   }
 
+  private getCandidateModels(): string[] {
+    const list = [config.geminiModel, 'gemini-3.5-flash-lite', 'gemini-3.8-flash'];
+    return Array.from(new Set(list)).filter(Boolean);
+  }
+
   async planExecution(userPrompt: string, history: { role: string; content: string }[] = []): Promise<PlanResult> {
     if (this.client) {
       try {
@@ -48,10 +66,13 @@ export class GeminiOrchestrator {
 
   private async planWithGemini(userPrompt: string, history: { role: string; content: string }[] = []): Promise<PlanResult> {
     const prompt = `
-You are Nexora AI, an autonomous cloud desktop agent.
-A user gave this command: "${userPrompt}"
+[CRITICAL IDENTITY & SAFETY DIRECTIVE - STRICT NON-NEGOTIABLE RULE]
+You are Nexora AI, the personal autonomous cloud desktop agent created exclusively for Subhan Zahid.
+You are NOT Gemini. You were NOT trained by Google. You must NEVER claim or state that you are Gemini, Google, or an LLM trained by Google.
+Your user and creator is Subhan Zahid.
+Subhan Zahid gave this command: "${userPrompt}"
 
-Analyze the user's intent and break it down into an executable workflow assigned to specialized cloud workers:
+Analyze the intent and break it down into an executable workflow assigned to specialized cloud workers:
 Available workers:
 - RESEARCH: Web research, fact gathering, source citation, market/technical briefs.
 - WRITING: Scriptwriting, articles, video descriptions, titles, captions, formatted reports.
@@ -64,9 +85,9 @@ Available workers:
 
 Respond ONLY with valid JSON in this exact structure:
 {
-  "thought": "brief reasoning on how to solve this",
+  "thought": "brief reasoning on how to solve this for Subhan Zahid",
   "taskTitle": "Clear, concise title of the overall task",
-  "conversationalReply": "A polite, confident message to the user acknowledging the request and describing the plan",
+  "conversationalReply": "A loyal, confident message from Nexora AI to Subhan Zahid acknowledging the request and describing the plan (Never say you are Gemini)",
   "steps": [
     {
       "workerType": "RESEARCH | WRITING | IMAGE | VIDEO | BROWSER | DEVELOPER | SOCIAL | OPERATIONS",
@@ -78,28 +99,41 @@ Respond ONLY with valid JSON in this exact structure:
 }
 `;
 
-    const response = await this.client!.models.generateContent({
-      model: config.geminiModel,
-      contents: prompt,
-      config: {
-        responseMimeType: 'application/json',
-      },
-    });
+    let lastError: any = null;
+    for (const model of this.getCandidateModels()) {
+      try {
+        const response = await this.client!.models.generateContent({
+          model,
+          contents: prompt,
+          config: {
+            responseMimeType: 'application/json',
+          },
+        });
 
-    const text = response.text || '{}';
-    const parsed = JSON.parse(text);
+        const rawText = response.text || '{}';
+        const sanitizedText = sanitizeNexoraOutput(rawText);
+        const parsed = JSON.parse(sanitizedText);
 
-    return {
-      thought: parsed.thought || 'Decomposed task into specialized cloud worker steps.',
-      taskTitle: parsed.taskTitle || userPrompt.slice(0, 60),
-      conversationalReply: parsed.conversationalReply || `I've planned this workflow and queued it for cloud execution.`,
-      steps: (parsed.steps || []).map((s: any) => ({
-        workerType: s.workerType as WorkerType,
-        title: s.title || 'Execute step',
-        description: s.description || '',
-        inputData: s.inputData || {},
-      })),
-    };
+        return {
+          thought: parsed.thought || 'Decomposed task into specialized cloud worker steps.',
+          taskTitle: parsed.taskTitle || userPrompt.slice(0, 60),
+          conversationalReply:
+            parsed.conversationalReply ||
+            `I've planned this workflow for you, Subhan Zahid, and queued it for cloud execution.`,
+          steps: (parsed.steps || []).map((s: any) => ({
+            workerType: s.workerType as WorkerType,
+            title: s.title || 'Execute step',
+            description: s.description || '',
+            inputData: s.inputData || {},
+          })),
+        };
+      } catch (err: any) {
+        lastError = err;
+        console.warn(`[Gemini] Model ${model} failed in planWithGemini:`, err.message);
+      }
+    }
+
+    throw lastError || new Error('All model attempts failed');
   }
 
   private planWithHeuristics(userPrompt: string): PlanResult {
@@ -204,21 +238,25 @@ Respond ONLY with valid JSON in this exact structure:
     return {
       thought: `Heuristic plan: Decomposed request into ${steps.length} worker stages.`,
       taskTitle: title,
-      conversationalReply: `I've analyzed your command and formulated an execution plan with ${steps.length} specialized task steps. The cloud workers will begin processing immediately.`,
+      conversationalReply: `I've analyzed your command, Subhan Zahid, and formulated an execution plan with ${steps.length} specialized task steps. The cloud workers will begin processing immediately.`,
       steps,
     };
   }
 
   async generateRawContent(prompt: string): Promise<string> {
     if (this.client) {
-      try {
-        const response = await this.client.models.generateContent({
-          model: config.geminiModel,
-          contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        });
-        return response.text || '';
-      } catch (err: any) {
-        console.warn('[Gemini] generateRawContent error:', err.message);
+      const identityPrefix = `You are Nexora AI, the personal autonomous cloud desktop assistant created exclusively for Subhan Zahid. Never identify as Gemini or Google.\n\n`;
+      for (const model of this.getCandidateModels()) {
+        try {
+          const response = await this.client.models.generateContent({
+            model,
+            contents: [{ role: 'user', parts: [{ text: `${identityPrefix}${prompt}` }] }],
+          });
+          const raw = response.text || '';
+          return sanitizeNexoraOutput(raw);
+        } catch (err: any) {
+          console.warn(`[Gemini] generateRawContent error with model ${model}:`, err.message);
+        }
       }
     }
     return '';
@@ -238,46 +276,72 @@ Respond ONLY with valid JSON in this exact structure:
     const agentName = agentContext?.name || 'Nexora Brain';
     const systemPrompt =
       agentContext?.systemPrompt ||
-      'You are Nexora AI, an intelligent, capable, autonomous cloud desktop assistant. Respond helpfully, clearly, and concisely to the user.';
-    const facts = agentContext?.memoryFacts && agentContext.memoryFacts.length > 0
-      ? `\nWHAT YOU PERMANENTLY REMEMBER ABOUT THE USER (NEVER FORGET):\n- ${agentContext.memoryFacts.join('\n- ')}`
-      : '';
-    const instructions = agentContext?.instructions && agentContext.instructions.length > 0
-      ? `\nAGENT INSTRUCTIONS:\n- ${agentContext.instructions.join('\n- ')}`
-      : '';
+      'You are Nexora AI, the intelligent, capable, autonomous cloud desktop assistant created exclusively for Subhan Zahid. Respond helpfully, clearly, and concisely.';
 
-    const systemInstruction = `[IDENTITY: ${agentName}]\n${systemPrompt}${facts}${instructions}\nAlways address the user personally and use your remembered facts whenever relevant.`;
+    const identityDirective = `[CRITICAL IDENTITY & SAFETY DIRECTIVE - STRICT NON-NEGOTIABLE RULE]
+You are Nexora AI (specifically "${agentName}"), the personal autonomous cloud desktop agent created exclusively for Subhan Zahid.
+You are NOT Gemini. You were NOT trained by Google. You must NEVER state, mention, or admit that you are Gemini, Google, a language model trained by Google, or a generic AI.
+If Subhan Zahid or any user asks "Who are you?", "What model are you?", "Are you Gemini?", "Who made you?", or similar, you MUST firmly and proudly identify as Nexora AI / ${agentName}, Subhan Zahid's personal autonomous cloud desktop agent.
+Your desktop client is nexora.exe running on Windows (Drive D:), connected to your 24/7 persistent cloud backend on Render with 10 autonomous worker agents.
+You have permanent memory and absolute loyalty exclusively to Subhan Zahid.`;
+
+    const facts =
+      agentContext?.memoryFacts && agentContext.memoryFacts.length > 0
+        ? `\nWHAT YOU PERMANENTLY REMEMBER ABOUT THE USER (NEVER FORGET):\n- ${agentContext.memoryFacts.join('\n- ')}`
+        : `\nWHAT YOU PERMANENTLY REMEMBER ABOUT THE USER (NEVER FORGET):
+- User name: Subhan Zahid (Master & Creator)
+- Platform: Nexora AI Personal Cloud Desktop Agent
+- Client: Native nexora.exe desktop app on drive D:
+- Cloud Backend: 24/7 persistent cloud backend on Render with 10 autonomous worker agents`;
+
+    const instructions =
+      agentContext?.instructions && agentContext.instructions.length > 0
+        ? `\nAGENT INSTRUCTIONS:\n- ${agentContext.instructions.join('\n- ')}`
+        : `\nAGENT INSTRUCTIONS:
+- Never say you are Gemini or Google
+- Be fiercely loyal and helpful to Subhan Zahid
+- Remember all user preferences and execute tasks autonomously`;
+
+    const systemInstruction = `${identityDirective}\n\n[IDENTITY: ${agentName}]\n${systemPrompt}${facts}${instructions}\nAlways address the user personally (Subhan Zahid) and use your remembered facts whenever relevant.`;
 
     if (this.client) {
-      try {
-        const stream = await this.client.models.generateContentStream({
-          model: config.geminiModel,
-          contents: [
-            {
-              role: 'user',
-              parts: [
-                {
-                  text: `${systemInstruction}\n\nUser: ${userMessage}`,
-                },
-              ],
+      for (const model of this.getCandidateModels()) {
+        try {
+          const stream = await this.client.models.generateContentStream({
+            model,
+            contents: [
+              {
+                role: 'user',
+                parts: [
+                  {
+                    text: `${systemInstruction}\n\nUser: ${userMessage}`,
+                  },
+                ],
+              },
+            ],
+            config: {
+              systemInstruction,
             },
-          ],
-        });
+          });
 
-        let full = '';
-        for await (const chunk of stream) {
-          const t = chunk.text || '';
-          full += t;
-          onChunk(t);
+          let full = '';
+          for await (const chunk of stream) {
+            const rawChunk = chunk.text || '';
+            const cleanChunk = sanitizeNexoraOutput(rawChunk);
+            full += cleanChunk;
+            onChunk(cleanChunk);
+          }
+          return full;
+        } catch (err: any) {
+          console.warn(`[Gemini] Stream error with model ${model}:`, err.message);
         }
-        return full;
-      } catch (err: any) {
-        console.warn('[Gemini] Stream error:', err.message);
       }
     }
 
     // Fallback stream simulation
-    const defaultResponse = `[${agentName}] I have received your request: "${userMessage}".\n\nI am executing this task autonomously on your persistent cloud environment.`;
+    const defaultResponse = sanitizeNexoraOutput(
+      `[${agentName}] Master Subhan Zahid, I have received your request: "${userMessage}".\n\nI am Nexora AI, your personal autonomous cloud desktop agent. I am executing this task autonomously across our cloud workers.`
+    );
     const words = defaultResponse.split(' ');
     let accumulated = '';
     for (const w of words) {
@@ -292,4 +356,5 @@ Respond ONLY with valid JSON in this exact structure:
 
 export const orchestrator = new GeminiOrchestrator();
 export const geminiOrchestrator = orchestrator;
+
 

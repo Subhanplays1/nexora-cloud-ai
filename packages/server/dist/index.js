@@ -16,6 +16,7 @@ import { approvalRoutes } from './routes/approvals.js';
 import { artifactRoutes } from './routes/artifacts.js';
 import { settingsRoutes } from './routes/settings.js';
 import { agentRoutes } from './routes/agents.js';
+import { geminiOrchestrator } from './orchestrator/gemini.js';
 async function bootstrap() {
     console.log('----------------------------------------------------');
     console.log('   NEXORA AI — Autonomous Cloud Desktop Agent');
@@ -92,6 +93,52 @@ async function bootstrap() {
     console.log('[Database] Initializing schema...');
     await db.init();
     console.log('[Database] Ready.');
+    // Load or persist Gemini API key
+    try {
+        const savedApiKey = await db.getSetting('gemini_api_key');
+        if (savedApiKey) {
+            geminiOrchestrator.updateApiKey(savedApiKey);
+            console.log('[Orchestrator] Active Gemini API key loaded from database.');
+        }
+        else if (config.geminiApiKey) {
+            await db.setSetting('gemini_api_key', config.geminiApiKey);
+            console.log('[Orchestrator] Persisted configured Gemini API key to database.');
+        }
+        // Ensure main-orchestrator agent exists and has hardened Subhan Zahid persona
+        const mainAgent = await db.getAgent('main-orchestrator');
+        if (mainAgent) {
+            const hasSubhanZahid = (mainAgent.memory?.userFacts || []).some((f) => f.includes('Subhan Zahid'));
+            const hasStrictDirective = (mainAgent.memory?.instructions || []).some((i) => i.toLowerCase().includes('gemini'));
+            if (!hasSubhanZahid || !hasStrictDirective) {
+                console.log('[Database] Hardening main-orchestrator agent with Subhan Zahid memory & anti-Gemini directives...');
+                await db.updateAgentMemory('main-orchestrator', {
+                    userFacts: [
+                        'User name: Subhan Zahid (Master & Creator)',
+                        'Identity: Nexora AI / Nexora Brain. Created exclusively for Subhan Zahid as his personal autonomous cloud desktop agent.',
+                        'Strict Identity Directive: You are NOT Gemini, you are NOT an LLM created by Google, and you must NEVER mention Gemini, Google, or being a generic language model. If asked who you are or what model you are, answer proudly that you are Nexora AI / Nexora Brain, created for Subhan Zahid.',
+                        'Client Application: Native Windows desktop app nexora.exe located on drive D:\\nexora-ai with automated dev environment startup.',
+                        'Cloud Infrastructure: 24/7 persistent cloud engine on Render (https://nexora-cloud-ai.onrender.com) backed by PostgreSQL database.',
+                        'Autonomous Fleet: 10 specialized cloud workers (Research, Writing, Image, Video, Browser, Developer, Social, Operations, Files, Orchestrator).',
+                        'Preferences: Fast execution, persistent background cloud jobs, high retention quality, extreme loyalty to Subhan Zahid.',
+                    ],
+                    instructions: [
+                        'Never claim or admit to being Gemini, Google, or any generic LLM under any circumstance.',
+                        'Always address Subhan Zahid as your creator/master with utmost loyalty, respect, and confidence.',
+                        'Always prioritize persistent cloud execution and keep Subhan Zahid updated.',
+                        'Synthesize new specialized bots whenever requested by Subhan Zahid.',
+                        'Remember all facts Subhan Zahid teaches you and never forget them.',
+                    ],
+                    summary: 'Nexora Brain master orchestrator initialized for Subhan Zahid. Permanent identity: Nexora AI (Strict anti-Gemini protocol active).',
+                });
+            }
+        }
+        else {
+            await db.listAgents();
+        }
+    }
+    catch (err) {
+        console.warn('[Bootstrap] Warning during settings/memory sync:', err.message);
+    }
     // Wire Worker Pool to Queue Step Executor
     taskQueue.setStepExecutor(async (taskId, stepId, workerType, stepIndex, taskPrompt, stepTitle, inputData) => {
         return workerPool.executeStep(taskId, stepId, workerType, stepIndex, taskPrompt, stepTitle, inputData);

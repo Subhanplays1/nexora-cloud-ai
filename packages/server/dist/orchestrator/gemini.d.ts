@@ -16,6 +16,7 @@ export declare class GeminiOrchestrator {
     constructor();
     isConfigured(): boolean;
     updateApiKey(newKey: string): void;
+    private getCandidateModels;
     planExecution(userPrompt: string, history?: {
         role: string;
         content: string;
