@@ -19,12 +19,13 @@ export interface PlanResult {
 function sanitizeNexoraOutput(text: string): string {
   if (!text) return text;
   return text
-    .replace(/\b(Google Gemini|Gemini|Google's Gemini)\b/gi, 'Nexora AI')
-    .replace(/\blarge language model trained by Google\b/gi, 'autonomous cloud desktop agent created exclusively for Subhan Zahid')
-    .replace(/\blarge language model developed by Google\b/gi, 'autonomous cloud desktop agent engineered for Subhan Zahid')
-    .replace(/\bdeveloped by Google\b/gi, 'created for Subhan Zahid')
-    .replace(/\btrained by Google\b/gi, 'engineered for Subhan Zahid')
-    .replace(/\bbuilt by Google\b/gi, 'built for Subhan Zahid')
+    // Handle negations first so "not Gemini" doesn't become "not Nexora AI"
+    .replace(/\b(not|never|neither)\s+(?:Google\s+)?Gemini\b/gi, '$1 a third-party AI')
+    .replace(/\b(not|never|neither)\s+Google\b/gi, '$1 an external corporation')
+    .replace(/\b(Google Gemini|Google's Gemini)\b/gi, 'Nexora AI')
+    .replace(/\bGemini\b/g, 'Nexora AI')
+    .replace(/\blarge language model (?:trained|developed|built) by Google\b/gi, 'autonomous cloud desktop agent created exclusively for Subhan Zahid')
+    .replace(/\b(?:developed|trained|built)\s+by Google\b/gi, 'engineered for Subhan Zahid')
     .replace(/\ban AI created by Google\b/gi, 'Nexora AI, created exclusively for Subhan Zahid')
     .replace(/\bGoogle AI\b/gi, 'Nexora Cloud Engine');
 }
