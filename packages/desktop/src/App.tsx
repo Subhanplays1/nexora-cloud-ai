@@ -1,6 +1,7 @@
 import React from 'react';
 import { useApp } from './context/AppContext';
 import { Sidebar } from './components/Sidebar';
+import { WorkerTeamBar } from './components/common/WorkerTeamBar';
 import { ChatView } from './components/Chat/ChatView';
 import { LiveActivityView } from './components/LiveActivity/LiveActivityView';
 import { TasksView } from './components/Tasks/TasksView';
@@ -38,6 +39,9 @@ export const App: React.FC = () => {
             </button>
           </div>
         )}
+
+        {/* Global Autonomous Squad Roster Bar */}
+        <WorkerTeamBar />
 
         {/* View Routing */}
         <div className="flex-1 flex overflow-hidden">

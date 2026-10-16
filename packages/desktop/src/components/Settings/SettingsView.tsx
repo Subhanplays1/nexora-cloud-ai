@@ -1,15 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { Settings as SettingsIcon, Server, Cpu, ShieldAlert, Check, RefreshCw, Key } from 'lucide-react';
+import { Server, Cpu, ShieldAlert, Check, Key } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { WorkerAvatar, WORKER_REGISTRY } from '../common/WorkerAvatar';
 
 export const SettingsView: React.FC = () => {
-  const { backendUrl, setBackendUrl, connected, emergencyStop } = useApp();
+  const { backendUrl, setBackendUrl, connected, emergencyStop, activeTask } = useApp();
 
   const [urlInput, setUrlInput] = useState(backendUrl);
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [modelInput, setModelInput] = useState('gemini-3.8-flash');
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [healthData, setHealthData] = useState<any>(null);
+
+  const currentWorkerType = activeTask?.steps[activeTask.currentStepIndex]?.workerType?.toUpperCase();
 
   useEffect(() => {
     setUrlInput(backendUrl);
@@ -45,117 +48,180 @@ export const SettingsView: React.FC = () => {
     }
   };
 
+  const squadKeys = [
+    'ORCHESTRATOR',
+    'RESEARCH',
+    'WRITING',
+    'IMAGE',
+    'VIDEO',
+    'BROWSER',
+    'DEVELOPER',
+    'SOCIAL',
+    'OPERATIONS',
+    'FILES',
+  ];
+
   return (
     <div className="flex-1 flex flex-col h-screen bg-surface-950 overflow-hidden">
       {/* Top Bar */}
-      <div className="h-16 border-b border-surface-800 px-6 flex items-center justify-between bg-surface-900/50">
+      <div className="h-16 border-b border-surface-800 px-6 flex items-center justify-between bg-surface-900/50 backdrop-blur-md">
         <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 rounded-lg bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
-            <SettingsIcon size={18} />
-          </div>
+          <WorkerAvatar type="OPERATIONS" size="sm" showGlow={false} />
           <div>
             <h1 className="text-sm font-bold text-white">System Settings & Configuration</h1>
             <p className="text-[11px] text-slate-400">Manage cloud backend endpoints, credentials, and models</p>
           </div>
         </div>
 
-        <div className="flex items-center space-x-2">
-          <span
-            className={`w-2.5 h-2.5 rounded-full ${connected ? 'bg-emerald-400 shadow-sm shadow-emerald-400' : 'bg-rose-500 animate-ping'}`}
-          />
-          <span className="text-xs font-semibold text-slate-300">
-            {connected ? 'Backend Online' : 'Backend Offline'}
-          </span>
-        </div>
-      </div>
-
-      {/* Settings Forms */}
-      <div className="flex-1 overflow-y-auto p-6 max-w-3xl space-y-6">
         {savedSuccess && (
-          <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-semibold flex items-center space-x-2">
-            <Check size={16} />
-            <span>Settings updated successfully!</span>
+          <div className="flex items-center space-x-1.5 px-3 py-1 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-semibold animate-fade-in">
+            <Check size={14} />
+            <span>Settings saved successfully</span>
           </div>
         )}
+      </div>
 
-        {/* Cloud Backend Endpoint */}
+      {/* Settings Form Container */}
+      <div className="flex-1 overflow-y-auto p-6 max-w-4xl space-y-6">
+        {/* Autonomous Squad Roster Showcase */}
+        <div className="p-6 rounded-2xl bg-surface-900/90 border border-surface-800 space-y-4 shadow-xl">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-bold text-white flex items-center space-x-2">
+                <span>Autonomous Agent Squad</span>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 font-semibold font-mono">
+                  10 Mascots Active
+                </span>
+              </h2>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Specialized agents ready to execute concurrent cloud jobs
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            {squadKeys.map((typeKey) => {
+              const info = WORKER_REGISTRY[typeKey];
+              if (!info) return null;
+              const isWorking = currentWorkerType === typeKey;
+
+              return (
+                <div
+                  key={typeKey}
+                  className={`p-3 rounded-2xl border flex flex-col items-center text-center space-y-2 transition duration-300 ${
+                    isWorking
+                      ? 'bg-cyan-500/15 border-cyan-400/50 shadow-lg shadow-cyan-500/20 scale-102 ring-1 ring-cyan-400/50'
+                      : 'bg-surface-850/70 border-surface-750/50 hover:bg-surface-800 hover:border-surface-650'
+                  }`}
+                >
+                  <WorkerAvatar
+                    type={typeKey}
+                    size="md"
+                    status={isWorking ? 'BUSY' : undefined}
+                    showGlow={isWorking}
+                  />
+                  <div>
+                    <div className="text-xs font-bold text-white leading-tight">{info.name}</div>
+                    <div className="text-[10px] text-cyan-400 font-mono font-semibold uppercase mt-0.5">
+                      {info.type}
+                    </div>
+                    <div className="text-[10px] text-slate-400 mt-1 leading-snug">
+                      {info.title}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Backend Cloud URL Config */}
         <div className="p-6 rounded-2xl bg-surface-900 border border-surface-800 space-y-4 shadow-lg">
           <div className="flex items-center space-x-3">
-            <div className="p-2.5 rounded-xl bg-surface-850 border border-surface-750 text-cyan-400">
+            <div className="p-2.5 rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/30">
               <Server size={18} />
             </div>
             <div>
-              <h2 className="text-sm font-bold text-white">Cloud Backend API URL</h2>
+              <h2 className="text-sm font-bold text-white">Cloud Orchestrator Endpoint</h2>
               <p className="text-xs text-slate-400">
-                Connect this desktop application to your local server or persistent Linux VPS
+                Specify the remote URL of your deployed Fastify backend (e.g. Render, VPS, or localhost)
               </p>
             </div>
           </div>
 
           <form onSubmit={handleSaveBackend} className="space-y-3">
-            <div className="flex space-x-2">
+            <div>
               <input
                 type="text"
                 value={urlInput}
                 onChange={(e) => setUrlInput(e.target.value)}
-                placeholder="http://localhost:3001 or http://vps-ip:3001"
-                className="flex-1 bg-surface-950 border border-surface-750 rounded-xl px-3.5 py-2 text-xs font-mono text-slate-100 placeholder-slate-400 focus:outline-none focus:border-cyan-500"
+                placeholder="https://nexora-cloud-ai.onrender.com"
+                className="w-full bg-surface-950 border border-surface-750 rounded-xl px-3.5 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500 font-mono"
               />
+            </div>
+
+            <div className="flex items-center justify-between text-xs text-slate-400">
+              <div className="flex items-center space-x-1.5">
+                <span
+                  className={`w-2 h-2 rounded-full ${
+                    connected ? 'bg-emerald-400 shadow-sm shadow-emerald-400' : 'bg-rose-500'
+                  }`}
+                />
+                <span>Status: {connected ? 'Online and connected' : 'Connecting / Offline'}</span>
+              </div>
+
               <button
                 type="submit"
-                className="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold transition"
+                className="px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white text-xs font-semibold transition shadow-md shadow-cyan-600/20"
               >
-                Connect
+                Apply Backend URL
               </button>
             </div>
-            <p className="text-[11px] text-slate-400">
-              Default local address is <code className="text-cyan-400">http://localhost:3001</code>. When deployed to a VPS, enter your public VPS IP or domain.
-            </p>
           </form>
         </div>
 
-        {/* Gemini Reasoning Engine Configuration */}
+        {/* Gemini Engine & Model Selection */}
         <div className="p-6 rounded-2xl bg-surface-900 border border-surface-800 space-y-4 shadow-lg">
           <div className="flex items-center space-x-3">
-            <div className="p-2.5 rounded-xl bg-surface-850 border border-surface-750 text-indigo-400">
+            <div className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/30">
               <Cpu size={18} />
             </div>
             <div>
-              <h2 className="text-sm font-bold text-white">Google Gemini Orchestrator</h2>
+              <h2 className="text-sm font-bold text-white">AI Intelligence Engine</h2>
               <p className="text-xs text-slate-400">
-                Configure official Gemini model reasoning and task decomposition
+                Configured to use Google Gemini 3.8 Flash / Pro for rapid planning and multimodal execution
               </p>
             </div>
           </div>
 
           <form onSubmit={handleSaveApi} className="space-y-4">
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-300">Model Identifier</label>
-              <select
-                value={modelInput}
-                onChange={(e) => setModelInput(e.target.value)}
-                className="w-full bg-surface-950 border border-surface-750 rounded-xl px-3.5 py-2 text-xs text-slate-200 focus:outline-none focus:border-cyan-500"
-              >
-                <option value="gemini-3.8-flash">gemini-3.8-flash (Recommended: Fast, agentic, 1M context)</option>
-                <option value="gemini-4-argon">gemini-4-argon (Most powerful reasoning and research)</option>
-                <option value="gemini-3.5-flash-lite">gemini-3.5-flash-lite (Lowest latency)</option>
-              </select>
-            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-300">Model Selector</label>
+                <select
+                  value={modelInput}
+                  onChange={(e) => setModelInput(e.target.value)}
+                  className="w-full bg-surface-950 border border-surface-750 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-cyan-500"
+                >
+                  <option value="gemini-3.8-flash">gemini-3.8-flash (Recommended)</option>
+                  <option value="gemini-2.5-flash">gemini-2.5-flash</option>
+                  <option value="gemini-2.5-pro">gemini-2.5-pro</option>
+                </select>
+              </div>
 
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-300">Server-Side Gemini API Key</label>
-              <div className="relative">
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-300 flex items-center space-x-1">
+                  <Key size={13} />
+                  <span>Custom GEMINI_API_KEY (Optional Override)</span>
+                </label>
                 <input
                   type="password"
                   value={apiKeyInput}
                   onChange={(e) => setApiKeyInput(e.target.value)}
-                  placeholder="Enter Gemini API key (kept exclusively on backend)..."
-                  className="w-full bg-surface-950 border border-surface-750 rounded-xl px-3.5 py-2 text-xs font-mono text-slate-100 placeholder-slate-400 focus:outline-none focus:border-cyan-500"
+                  placeholder="Leave blank to use server environment key"
+                  className="w-full bg-surface-950 border border-surface-750 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-cyan-500"
                 />
               </div>
-              <p className="text-[11px] text-slate-400">
-                Keys are stored only on the backend server environment and never exposed to the Electron frontend.
-              </p>
             </div>
 
             <button

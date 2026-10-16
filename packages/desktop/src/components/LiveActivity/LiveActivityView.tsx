@@ -6,18 +6,15 @@ import {
   Play,
   XCircle,
   RotateCcw,
-  CheckCircle2,
   Clock,
   Layers,
   FileCode,
   ShieldAlert,
-  ChevronRight,
   Maximize2,
   ExternalLink,
-  Zap,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
-import { TaskStep } from '@nexora/shared';
+import { WorkerAvatar, WORKER_REGISTRY } from '../common/WorkerAvatar';
 
 export const LiveActivityView: React.FC = () => {
   const {
@@ -40,7 +37,9 @@ export const LiveActivityView: React.FC = () => {
   const [activeConsoleTab, setActiveConsoleTab] = useState<'TERMINAL' | 'AUDIT_LOGS' | 'ARTIFACTS'>('TERMINAL');
   const [selectedHistoricalFrame, setSelectedHistoricalFrame] = useState<string | null>(null);
 
-  const runningTasks = tasks.filter((t) => t.status === 'RUNNING' || t.status === 'QUEUED' || t.status === 'WAITING_FOR_APPROVAL');
+  const runningTasks = tasks.filter(
+    (t) => t.status === 'RUNNING' || t.status === 'QUEUED' || t.status === 'WAITING_FOR_APPROVAL'
+  );
   const task = activeTask || (runningTasks.length > 0 ? runningTasks[0] : tasks[0]) || null;
   const currentStep = task?.steps[task.currentStepIndex] || null;
 
@@ -58,15 +57,21 @@ export const LiveActivityView: React.FC = () => {
     : null;
 
   const taskArtifacts = artifacts.filter((a) => a.taskId === task?.id);
+  const activeWorkerInfo = currentStep
+    ? WORKER_REGISTRY[currentStep.workerType] || WORKER_REGISTRY.ORCHESTRATOR
+    : WORKER_REGISTRY.ORCHESTRATOR;
 
   return (
     <div className="flex-1 flex flex-col h-screen bg-surface-950 overflow-hidden">
       {/* Top HUD: Task Selector & Controls */}
       <div className="h-16 border-b border-surface-800 px-6 flex items-center justify-between bg-surface-900/60 backdrop-blur-md">
-        <div className="flex items-center space-x-4">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-cyan-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-cyan-500/20">
-            <Monitor size={20} />
-          </div>
+        <div className="flex items-center space-x-3.5">
+          <WorkerAvatar
+            type={currentStep?.workerType || 'ORCHESTRATOR'}
+            size="sm"
+            status={task?.status === 'RUNNING' ? 'BUSY' : undefined}
+            showGlow={true}
+          />
 
           <div>
             <div className="flex items-center space-x-2">
@@ -162,20 +167,37 @@ export const LiveActivityView: React.FC = () => {
       <div className="flex-1 flex overflow-hidden">
         {/* Left Column: Visual Remote Sandbox Screen */}
         <div className="w-7/12 flex flex-col border-r border-surface-800 bg-surface-950 p-4 space-y-3 overflow-y-auto">
-          {/* Active Worker & Step Status Badge */}
+          {/* Active Worker Mascot Spotlight Banner */}
           {currentStep && (
-            <div className="flex items-center justify-between p-3 rounded-xl bg-surface-900 border border-surface-800">
-              <div className="flex items-center space-x-2.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping" />
-                <span className="text-xs font-bold text-slate-200">
-                  Worker: <span className="text-cyan-400">{currentStep.workerType}</span>
-                </span>
-                <span className="text-xs text-slate-400">•</span>
-                <span className="text-xs text-slate-300 font-medium truncate max-w-sm">
-                  Step {task.currentStepIndex + 1}/{task.steps.length}: {currentStep.title}
-                </span>
+            <div className="flex items-center justify-between p-3.5 rounded-2xl bg-surface-900/90 border border-surface-800 shadow-xl backdrop-blur-md">
+              <div className="flex items-center space-x-3.5">
+                <WorkerAvatar
+                  type={currentStep.workerType}
+                  size="md"
+                  status={task.status === 'RUNNING' ? 'BUSY' : 'COMPLETED'}
+                  showGlow={true}
+                />
+                <div>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-xs font-bold text-white">{activeWorkerInfo.name}</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 font-semibold font-mono uppercase">
+                      {currentStep.workerType}
+                    </span>
+                    <span className="text-xs text-slate-400">•</span>
+                    <span className="text-xs text-slate-300 font-medium">
+                      Step {task.currentStepIndex + 1} of {task.steps.length}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-0.5 truncate max-w-lg">
+                    {currentStep.title}
+                  </p>
+                </div>
               </div>
-              <div className="text-xs font-mono text-cyan-400 font-semibold">{task.progressPercent}%</div>
+
+              <div className="text-right">
+                <div className="text-sm font-mono text-cyan-400 font-bold">{task.progressPercent}%</div>
+                <div className="text-[10px] text-slate-400">Completion</div>
+              </div>
             </div>
           )}
 
@@ -226,16 +248,25 @@ export const LiveActivityView: React.FC = () => {
                   className="w-full h-full object-contain"
                 />
               ) : (
-                <div className="text-center space-y-2 p-8">
-                  <Monitor size={48} className="mx-auto text-slate-400" />
-                  <p className="text-sm font-medium text-slate-400">
-                    {task?.status === 'RUNNING'
-                      ? 'Awaiting remote display frame from cloud worker...'
-                      : 'No live visual stream for the selected task.'}
-                  </p>
-                  <p className="text-xs text-slate-400">
-                    Screenshots from Playwright browser automation and visual assets render here automatically.
-                  </p>
+                <div className="text-center space-y-3 p-8">
+                  <div className="flex justify-center">
+                    <WorkerAvatar
+                      type={currentStep?.workerType || 'ORCHESTRATOR'}
+                      size="lg"
+                      status={task?.status === 'RUNNING' ? 'BUSY' : undefined}
+                      showGlow={true}
+                    />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-slate-200">
+                      {task?.status === 'RUNNING'
+                        ? `${activeWorkerInfo.name} is executing step...`
+                        : 'Awaiting remote display frame from cloud worker'}
+                    </p>
+                    <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
+                      Screenshots from Playwright browser automation and generated graphics render here automatically.
+                    </p>
+                  </div>
                 </div>
               )}
             </div>
@@ -354,18 +385,16 @@ export const LiveActivityView: React.FC = () => {
                 {task?.steps.map((s, i) => (
                   <div key={s.id} className="p-3 rounded-xl bg-surface-850 border border-surface-800 space-y-2">
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        <span className="w-5 h-5 rounded-full bg-surface-800 flex items-center justify-center text-[10px] font-bold text-slate-300">
-                          {i + 1}
-                        </span>
+                      <div className="flex items-center space-x-2.5">
+                        <WorkerAvatar type={s.workerType} size="xs" showGlow={false} />
                         <span className="font-semibold text-slate-200">{s.title}</span>
                       </div>
                       <span className="text-[10px] px-2 py-0.5 rounded bg-surface-800 text-cyan-400 font-mono">
-                        {s.workerType}
+                        {WORKER_REGISTRY[s.workerType]?.name || s.workerType}
                       </span>
                     </div>
 
-                    <div className="space-y-1 pl-7 text-[11px] text-slate-400">
+                    <div className="space-y-1 pl-8 text-[11px] text-slate-400">
                       {s.logs.length === 0 ? (
                         <p className="italic text-slate-400">Step queued...</p>
                       ) : (

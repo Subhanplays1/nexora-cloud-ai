@@ -16,6 +16,8 @@ import {
 } from 'lucide-react';
 import { useApp, NavTab } from '../context/AppContext';
 
+import { WorkerAvatar } from './common/WorkerAvatar';
+
 export const Sidebar: React.FC = () => {
   const {
     activeTab,
@@ -56,12 +58,14 @@ export const Sidebar: React.FC = () => {
       }`}
     >
       {/* Brand & Collapse Header */}
-      <div className="p-4 flex items-center justify-between border-b border-surface-800">
-        {!collapsed && (
+      <div className="p-3.5 flex items-center justify-between border-b border-surface-800">
+        {collapsed ? (
+          <div className="flex justify-center w-full py-1">
+            <WorkerAvatar type="ORCHESTRATOR" size="sm" showGlow={true} />
+          </div>
+        ) : (
           <div className="flex items-center space-x-2.5">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
-              <Zap size={18} className="text-white fill-white" />
-            </div>
+            <WorkerAvatar type="ORCHESTRATOR" size="sm" showGlow={true} />
             <div>
               <div className="flex items-center space-x-1.5">
                 <span className="font-extrabold tracking-tight text-white text-base">NEXORA</span>
