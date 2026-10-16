@@ -1,6 +1,8 @@
 using System;
 using System.IO;
+using System.Net;
 using System.Diagnostics;
+using System.Threading;
 using System.Windows.Forms;
 
 namespace NexoraLauncher
@@ -8,23 +10,59 @@ namespace NexoraLauncher
     static class Program
     {
         [STAThread]
-        static void Main(string[] args)
+        static void Main()
         {
+            Process devProcess = null;
             try
             {
-                // Target cloud backend URL or custom argument
-                string targetUrl = "https://nexora-cloud-ai.onrender.com";
-                if (args.Length > 0 && !string.IsNullOrEmpty(args[0]))
+                string desktopDir = Path.Combine("D:\\nexora-ai", "packages", "desktop");
+                if (!Directory.Exists(desktopDir))
                 {
-                    targetUrl = args[0];
+                    desktopDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "packages", "desktop");
                 }
 
-                // Locate Microsoft Edge or Chrome
+                // 1. Launch `npm run dev` in background
+                ProcessStartInfo npmPsi = new ProcessStartInfo
+                {
+                    FileName = "cmd.exe",
+                    Arguments = "/c npm run dev",
+                    WorkingDirectory = desktopDir,
+                    CreateNoWindow = true,
+                    UseShellExecute = false
+                };
+
+                devProcess = Process.Start(npmPsi);
+
+                // 2. Wait until dev server is listening on port 5173
+                string targetUrl = "http://localhost:5173";
+                bool serverReady = false;
+                for (int i = 0; i < 30; i++)
+                {
+                    try
+                    {
+                        HttpWebRequest req = (HttpWebRequest)WebRequest.Create(targetUrl);
+                        req.Timeout = 800;
+                        using (HttpWebResponse resp = (HttpWebResponse)req.GetResponse())
+                        {
+                            if ((int)resp.StatusCode >= 200 && (int)resp.StatusCode < 400)
+                            {
+                                serverReady = true;
+                                break;
+                            }
+                        }
+                    }
+                    catch
+                    {
+                        Thread.Sleep(500);
+                    }
+                }
+
+                // 3. Find browser (Edge or Chrome)
                 string browserPath = FindBrowser();
                 if (string.IsNullOrEmpty(browserPath))
                 {
                     MessageBox.Show(
-                        "Microsoft Edge or Google Chrome is required to run Nexora AI Desktop.\nPlease ensure one is installed on this computer.",
+                        "Microsoft Edge or Google Chrome is required to launch Nexora AI.",
                         "Nexora AI",
                         MessageBoxButtons.OK,
                         MessageBoxIcon.Error
@@ -32,36 +70,55 @@ namespace NexoraLauncher
                     return;
                 }
 
-                // Profile directory on D: for desktop app cache and cookies
+                // 4. Dedicated profile directory on D:
                 string profileDir = Path.Combine("D:\\nexora-ai", "desktop-profile");
                 if (!Directory.Exists(profileDir))
                 {
                     Directory.CreateDirectory(profileDir);
                 }
 
-                // Launch in standalone application window mode (frameless, no tabs, no address bar)
+                // 5. Open standalone app window pointing to http://localhost:5173
                 string arguments = string.Format(
                     "--app=\"{0}\" --window-size=1360,880 --user-data-dir=\"{1}\" --no-first-run --no-default-browser-check",
                     targetUrl,
                     profileDir
                 );
 
-                ProcessStartInfo psi = new ProcessStartInfo
+                ProcessStartInfo browserPsi = new ProcessStartInfo
                 {
                     FileName = browserPath,
                     Arguments = arguments,
                     UseShellExecute = false
                 };
 
-                Process appProcess = Process.Start(psi);
-                if (appProcess != null)
+                Process browserProcess = Process.Start(browserPsi);
+                if (browserProcess != null)
                 {
-                    appProcess.WaitForExit();
+                    browserProcess.WaitForExit();
                 }
             }
             catch (Exception ex)
             {
                 MessageBox.Show("Error starting Nexora AI: " + ex.Message, "Nexora AI", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                // Kill dev server process tree cleanly on exit
+                if (devProcess != null && !devProcess.HasExited)
+                {
+                    try
+                    {
+                        ProcessStartInfo killPsi = new ProcessStartInfo
+                        {
+                            FileName = "taskkill",
+                            Arguments = string.Format("/F /T /PID {0}", devProcess.Id),
+                            CreateNoWindow = true,
+                            UseShellExecute = false
+                        };
+                        Process.Start(killPsi);
+                    }
+                    catch { }
+                }
             }
         }
 
