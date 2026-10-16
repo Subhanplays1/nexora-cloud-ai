@@ -1,0 +1,11 @@
+node_modules/
+dist/
+dist-electron/
+.env
+data/*.db
+data/*.db-journal
+storage/*
+!storage/.gitkeep
+workspaces/*
+!workspaces/.gitkeep
+*.log

@@ -1,0 +1,72 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: nexora-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: nexora
+      POSTGRES_PASSWORD: nexora_secure_password
+      POSTGRES_DB: nexora
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nexora -d nexora"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: nexora-redis
+    restart: always
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  nexora-server:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: nexora-server
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      HOST: 0.0.0.0
+      DATABASE_URL: postgresql://nexora:nexora_secure_password@postgres:5432/nexora
+      REDIS_URL: redis://redis:6379
+      STORAGE_DIR: /app/storage
+      DATA_DIR: /app/data
+      WORKSPACE_DIR: /app/workspaces
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.8-flash}
+      JWT_SECRET: ${JWT_SECRET:-nexora-production-secret}
+    volumes:
+      - storage_data:/app/storage
+      - workspace_data:/app/workspaces
+      - app_data:/app/data
+    ports:
+      - "3001:3001"
+
+volumes:
+  postgres_data:
+  redis_data:
+  storage_data:
+  workspace_data:
+  app_data:

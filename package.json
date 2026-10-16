@@ -1,0 +1,22 @@
+{
+  "name": "nexora-ai",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Nexora AI — Autonomous Cloud Desktop Agent",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "build:shared": "npm run build -w @nexora/shared",
+    "build:server": "npm run build -w @nexora/server",
+    "build:desktop": "npm run build -w @nexora/desktop",
+    "start:server": "npm run start -w @nexora/server",
+    "dev:server": "npm run dev -w @nexora/server",
+    "dev:desktop": "npm run dev -w @nexora/desktop",
+    "test": "npm run test --workspaces"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2"
+  }
+}

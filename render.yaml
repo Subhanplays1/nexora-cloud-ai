@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: nexora-cloud-ai
+    runtime: node
+    plan: free
+    region: oregon
+    buildCommand: npm install && npm run build:shared && npm run build:server
+    startCommand: npm run start:server
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: GEMINI_MODEL
+        value: gemini-3.8-flash
+      - key: JWT_SECRET
+        generateValue: true
