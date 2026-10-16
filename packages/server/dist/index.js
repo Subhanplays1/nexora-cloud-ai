@@ -15,6 +15,7 @@ import { taskRoutes } from './routes/tasks.js';
 import { approvalRoutes } from './routes/approvals.js';
 import { artifactRoutes } from './routes/artifacts.js';
 import { settingsRoutes } from './routes/settings.js';
+import { agentRoutes } from './routes/agents.js';
 async function bootstrap() {
     console.log('----------------------------------------------------');
     console.log('   NEXORA AI — Autonomous Cloud Desktop Agent');
@@ -86,6 +87,7 @@ async function bootstrap() {
     await app.register(approvalRoutes);
     await app.register(artifactRoutes);
     await app.register(settingsRoutes);
+    await app.register(agentRoutes);
     // Initialize DB tables
     console.log('[Database] Initializing schema...');
     await db.init();

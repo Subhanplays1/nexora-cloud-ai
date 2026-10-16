@@ -22,10 +22,17 @@ export declare class GeminiOrchestrator {
     }[]): Promise<PlanResult>;
     private planWithGemini;
     private planWithHeuristics;
+    generateRawContent(prompt: string): Promise<string>;
     streamConversationalResponse(userMessage: string, history: {
         role: string;
         content: string;
-    }[], onChunk: (chunk: string) => void): Promise<string>;
+    }[], onChunk: (chunk: string) => void, agentContext?: {
+        name?: string;
+        systemPrompt?: string;
+        memoryFacts?: string[];
+        instructions?: string[];
+    }): Promise<string>;
 }
 export declare const orchestrator: GeminiOrchestrator;
+export declare const geminiOrchestrator: GeminiOrchestrator;
 //# sourceMappingURL=gemini.d.ts.map

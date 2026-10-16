@@ -188,7 +188,32 @@ Respond ONLY with valid JSON in this exact structure:
             steps,
         };
     }
-    async streamConversationalResponse(userMessage, history, onChunk) {
+    async generateRawContent(prompt) {
+        if (this.client) {
+            try {
+                const response = await this.client.models.generateContent({
+                    model: config.geminiModel,
+                    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+                });
+                return response.text || '';
+            }
+            catch (err) {
+                console.warn('[Gemini] generateRawContent error:', err.message);
+            }
+        }
+        return '';
+    }
+    async streamConversationalResponse(userMessage, history, onChunk, agentContext) {
+        const agentName = agentContext?.name || 'Nexora Brain';
+        const systemPrompt = agentContext?.systemPrompt ||
+            'You are Nexora AI, an intelligent, capable, autonomous cloud desktop assistant. Respond helpfully, clearly, and concisely to the user.';
+        const facts = agentContext?.memoryFacts && agentContext.memoryFacts.length > 0
+            ? `\nWHAT YOU PERMANENTLY REMEMBER ABOUT THE USER (NEVER FORGET):\n- ${agentContext.memoryFacts.join('\n- ')}`
+            : '';
+        const instructions = agentContext?.instructions && agentContext.instructions.length > 0
+            ? `\nAGENT INSTRUCTIONS:\n- ${agentContext.instructions.join('\n- ')}`
+            : '';
+        const systemInstruction = `[IDENTITY: ${agentName}]\n${systemPrompt}${facts}${instructions}\nAlways address the user personally and use your remembered facts whenever relevant.`;
         if (this.client) {
             try {
                 const stream = await this.client.models.generateContentStream({
@@ -198,7 +223,7 @@ Respond ONLY with valid JSON in this exact structure:
                             role: 'user',
                             parts: [
                                 {
-                                    text: `You are Nexora AI, an intelligent, capable, autonomous cloud desktop assistant. Respond helpfully, clearly, and concisely to the user.\nUser: ${userMessage}`,
+                                    text: `${systemInstruction}\n\nUser: ${userMessage}`,
                                 },
                             ],
                         },
@@ -217,7 +242,7 @@ Respond ONLY with valid JSON in this exact structure:
             }
         }
         // Fallback stream simulation
-        const defaultResponse = `I have received your request: "${userMessage}".\n\nI am orchestrating the task on the cloud backend. You can monitor live progress, screenshots, and terminal outputs in the Live Activity panel.`;
+        const defaultResponse = `[${agentName}] I have received your request: "${userMessage}".\n\nI am executing this task autonomously on your persistent cloud environment.`;
         const words = defaultResponse.split(' ');
         let accumulated = '';
         for (const w of words) {
@@ -230,4 +255,5 @@ Respond ONLY with valid JSON in this exact structure:
     }
 }
 export const orchestrator = new GeminiOrchestrator();
+export const geminiOrchestrator = orchestrator;
 //# sourceMappingURL=gemini.js.map

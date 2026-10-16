@@ -1,7 +1,8 @@
 import React from 'react';
 import { useApp } from './context/AppContext';
 import { Sidebar } from './components/Sidebar';
-import { WorkerTeamBar } from './components/common/WorkerTeamBar';
+import { BotCreatorView } from './components/BotStudio/BotCreatorView';
+import { AgentMemoryModal } from './components/BotStudio/AgentMemoryModal';
 import { ChatView } from './components/Chat/ChatView';
 import { LiveActivityView } from './components/LiveActivity/LiveActivityView';
 import { TasksView } from './components/Tasks/TasksView';
@@ -15,12 +16,12 @@ export const App: React.FC = () => {
   const { activeTab, connected, refreshAll } = useApp();
 
   return (
-    <div className="flex h-screen w-screen bg-surface-950 text-slate-100 overflow-hidden font-sans select-none">
+    <div className="flex h-screen w-screen bg-slate-100 dark:bg-surface-950 text-slate-800 dark:text-slate-100 overflow-hidden font-sans select-none">
       {/* Sidebar Navigation */}
       <Sidebar />
 
       {/* Main Content Area */}
-      <main className="flex-1 flex flex-col h-full relative overflow-hidden">
+      <main className="flex-1 flex flex-col h-full relative overflow-hidden bg-white dark:bg-surface-950">
         {/* Offline Banner if Cloud Backend is Disconnected */}
         {!connected && (
           <div className="bg-rose-950/80 border-b border-rose-800/80 px-4 py-2 flex items-center justify-between text-xs text-rose-200 z-40 backdrop-blur-md">
@@ -40,11 +41,9 @@ export const App: React.FC = () => {
           </div>
         )}
 
-        {/* Global Autonomous Squad Roster Bar */}
-        <WorkerTeamBar />
-
         {/* View Routing */}
         <div className="flex-1 flex overflow-hidden">
+          {activeTab === 'CREATE_BOT' && <BotCreatorView />}
           {activeTab === 'CHAT' && <ChatView />}
           {activeTab === 'LIVE_ACTIVITY' && <LiveActivityView />}
           {activeTab === 'TASKS' && <TasksView />}
@@ -55,6 +54,9 @@ export const App: React.FC = () => {
 
         {/* Global Action Approval Modal */}
         <ApprovalModal />
+
+        {/* Global Agent Memory & Brain Inspector Modal */}
+        <AgentMemoryModal />
       </main>
     </div>
   );

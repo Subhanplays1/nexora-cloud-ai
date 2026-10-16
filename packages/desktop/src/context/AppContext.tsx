@@ -10,9 +10,12 @@ import {
   WebSocketMessage,
   ScreenshotFramePayload,
   TerminalOutputPayload,
+  CustomAgent,
+  CreateAgentDto,
+  AgentMemory,
 } from '@nexora/shared';
 
-export type NavTab = 'CHAT' | 'LIVE_ACTIVITY' | 'TASKS' | 'FILES' | 'INTEGRATIONS' | 'SETTINGS';
+export type NavTab = 'CREATE_BOT' | 'CHAT' | 'LIVE_ACTIVITY' | 'TASKS' | 'FILES' | 'INTEGRATIONS' | 'SETTINGS';
 
 interface AppContextType {
   backendUrl: string;
@@ -34,6 +37,18 @@ interface AppContextType {
   pendingApprovals: ApprovalRequest[];
   workers: WorkerInfo[];
   artifacts: Artifact[];
+  // Dynamic Agents & Persistent Memory
+  agents: CustomAgent[];
+  activeAgentId: string | null;
+  setActiveAgentId: (id: string) => void;
+  activeAgent: CustomAgent | null;
+  isMemoryModalOpen: boolean;
+  setIsMemoryModalOpen: (open: boolean) => void;
+  createAgent: (dto: CreateAgentDto) => Promise<CustomAgent>;
+  generateAgentFromPrompt: (userRequirement: string) => Promise<CustomAgent>;
+  deleteAgent: (id: string) => Promise<void>;
+  addAgentFact: (agentId: string, fact: string) => Promise<void>;
+  removeAgentFact: (agentId: string, fact: string) => Promise<void>;
   // Actions
   createNewConversation: () => Promise<void>;
   deleteConversation: (id: string) => Promise<void>;
@@ -69,12 +84,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [workers, setWorkers] = useState<WorkerInfo[]>([]);
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
 
+  // Agents state
+  const [agents, setAgents] = useState<CustomAgent[]>([]);
+  const [activeAgentId, setActiveAgentIdState] = useState<string | null>(() => {
+    return localStorage.getItem('nexora_active_agent_id') || 'main-orchestrator';
+  });
+  const [isMemoryModalOpen, setIsMemoryModalOpen] = useState(false);
+
   const wsRef = useRef<WebSocket | null>(null);
 
   const setBackendUrl = (url: string) => {
     localStorage.setItem('nexora_backend_url', url);
     setBackendUrlState(url);
   };
+
+  const setActiveAgentId = (id: string) => {
+    localStorage.setItem('nexora_active_agent_id', id);
+    setActiveAgentIdState(id);
+    setActiveTab('CHAT');
+  };
+
+  const activeAgent = agents.find((a) => a.id === activeAgentId) || agents[0] || null;
 
   // Helper fetch with timeout
   const apiFetch = useCallback(
@@ -98,12 +128,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Initial Data Fetch
   const refreshAll = useCallback(async () => {
     try {
-      const [convList, taskList, approvalList, workerList, artifactList] = await Promise.all([
+      const [convList, taskList, approvalList, workerList, artifactList, agentResp] = await Promise.all([
         apiFetch('/api/conversations').catch(() => []),
         apiFetch('/api/tasks').catch(() => []),
         apiFetch('/api/approvals').catch(() => []),
         apiFetch('/api/workers').catch(() => []),
         apiFetch('/api/artifacts').catch(() => []),
+        apiFetch('/api/agents').catch(() => ({ agents: [] })),
       ]);
 
       setConversations(convList);
@@ -111,6 +142,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setPendingApprovals(approvalList);
       setWorkers(workerList);
       setArtifacts(artifactList);
+
+      const agentList: CustomAgent[] = agentResp.agents || [];
+      setAgents(agentList);
+
+      if (agentList.length > 0 && (!activeAgentId || !agentList.some((a) => a.id === activeAgentId))) {
+        setActiveAgentIdState(agentList[0].id);
+      }
 
       if (convList.length > 0 && !activeConversationId) {
         setActiveConversationId(convList[0].id);
@@ -121,7 +159,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } catch (err) {
       console.warn('[App] Error refreshing data:', err);
     }
-  }, [apiFetch, activeConversationId, activeTaskId]);
+  }, [apiFetch, activeConversationId, activeTaskId, activeAgentId]);
 
   // Load messages whenever activeConversationId changes
   useEffect(() => {
@@ -203,12 +241,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
 
       case 'TASK_STEP_UPDATED': {
-        const { taskId, step } = payload as { taskId: string; step: TaskStep };
+        const step = payload as TaskStep;
         setTasks((prev) =>
           prev.map((t) => {
-            if (t.id !== taskId) return t;
-            const updatedSteps = t.steps.map((s) => (s.id === step.id ? step : s));
-            return { ...t, steps: updatedSteps };
+            if (t.id === step.taskId) {
+              const updatedSteps = [...t.steps];
+              const idx = updatedSteps.findIndex((s) => s.id === step.id);
+              if (idx >= 0) updatedSteps[idx] = step;
+              return { ...t, steps: updatedSteps };
+            }
+            return t;
           })
         );
         break;
@@ -221,54 +263,63 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         break;
       }
 
-      case 'TERMINAL_OUTPUT': {
+      case 'TERMINAL_STREAM': {
         const term = payload as TerminalOutputPayload;
-        setLiveTerminalLogs((prev) => prev + term.text);
+        setLiveTerminalLogs((prev) => prev + term.chunk);
         break;
       }
 
       case 'APPROVAL_REQUIRED': {
-        const app = payload as ApprovalRequest;
+        const req = payload as ApprovalRequest;
         setPendingApprovals((prev) => {
-          if (prev.some((a) => a.id === app.id)) return prev;
-          return [...prev, app];
+          if (prev.some((a) => a.id === req.id)) return prev;
+          return [req, ...prev];
         });
         break;
       }
 
       case 'APPROVAL_RESOLVED': {
-        const resolved = payload as ApprovalRequest;
-        setPendingApprovals((prev) => prev.filter((a) => a.id !== resolved.id));
+        const req = payload as ApprovalRequest;
+        setPendingApprovals((prev) => prev.filter((a) => a.id !== req.id));
         break;
       }
 
       case 'CHAT_STREAM_CHUNK': {
-        const { conversationId, messageId, chunk } = payload;
-        if (conversationId === activeConversationId) {
-          setMessages((prev) =>
-            prev.map((m) => {
-              if (m.id === messageId) {
-                return { ...m, content: m.content + chunk, isStreaming: true };
-              }
-              return m;
-            })
-          );
-        }
+        const chunk = payload as { messageId: string; chunk: string };
+        setMessages((prev) =>
+          prev.map((m) => {
+            if (m.id === chunk.messageId) {
+              return {
+                ...m,
+                content: (m.content || '') + chunk.chunk,
+                isStreaming: true,
+              };
+            }
+            return m;
+          })
+        );
         break;
       }
 
       case 'CHAT_STREAM_END': {
-        const { conversationId, messageId, fullContent } = payload;
-        if (conversationId === activeConversationId) {
-          setMessages((prev) =>
-            prev.map((m) => {
-              if (m.id === messageId) {
-                return { ...m, content: fullContent, isStreaming: false, status: 'SENT' };
-              }
-              return m;
-            })
-          );
-        }
+        const end = payload as { messageId: string; fullContent: string };
+        setMessages((prev) =>
+          prev.map((m) => {
+            if (m.id === end.messageId) {
+              return {
+                ...m,
+                content: end.fullContent,
+                isStreaming: false,
+                status: 'SENT',
+              };
+            }
+            return m;
+          })
+        );
+        // Reload agents in case a new agent was synthesized autonomously
+        apiFetch('/api/agents')
+          .then((r) => setAgents(r.agents || []))
+          .catch(() => {});
         break;
       }
 
@@ -280,6 +331,60 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setArtifacts((prev) => [payload as Artifact, ...prev]);
         break;
     }
+  };
+
+  // Agent Creation
+  const createAgent = async (dto: CreateAgentDto): Promise<CustomAgent> => {
+    const res = await apiFetch('/api/agents', {
+      method: 'POST',
+      body: JSON.stringify(dto),
+    });
+    const created: CustomAgent = res.agent;
+    setAgents((prev) => [...prev, created]);
+    setActiveAgentId(created.id);
+    setActiveTab('CHAT');
+    return created;
+  };
+
+  // Autonomous Agent Synthesis by Main Agent
+  const generateAgentFromPrompt = async (userRequirement: string): Promise<CustomAgent> => {
+    const res = await apiFetch('/api/agents/generate', {
+      method: 'POST',
+      body: JSON.stringify({ userRequirement }),
+    });
+    const created: CustomAgent = res.agent;
+    setAgents((prev) => [...prev, created]);
+    setActiveAgentId(created.id);
+    setActiveTab('CHAT');
+    return created;
+  };
+
+  const deleteAgent = async (id: string) => {
+    await apiFetch(`/api/agents/${id}`, { method: 'DELETE' });
+    setAgents((prev) => prev.filter((a) => a.id !== id));
+    if (activeAgentId === id) {
+      setActiveAgentIdState('main-orchestrator');
+    }
+  };
+
+  const addAgentFact = async (agentId: string, fact: string) => {
+    const res = await apiFetch(`/api/agents/${agentId}/memory`, {
+      method: 'POST',
+      body: JSON.stringify({ fact }),
+    });
+    setAgents((prev) =>
+      prev.map((a) => (a.id === agentId ? { ...a, memory: res.memory } : a))
+    );
+  };
+
+  const removeAgentFact = async (agentId: string, fact: string) => {
+    const res = await apiFetch(`/api/agents/${agentId}/memory`, {
+      method: 'POST',
+      body: JSON.stringify({ removeFact: fact }),
+    });
+    setAgents((prev) =>
+      prev.map((a) => (a.id === agentId ? { ...a, memory: res.memory } : a))
+    );
   };
 
   const createNewConversation = async () => {
@@ -307,6 +412,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setActiveConversationId(targetConvId);
     }
 
+    const currentAgent = activeAgent;
+
     // Optimistic user message insertion
     const tempUserMsg: ChatMessage = {
       id: 'temp-' + Date.now(),
@@ -321,7 +428,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       id: 'temp-ast-' + Date.now(),
       conversationId: targetConvId,
       role: 'assistant',
-      content: 'Planning autonomous cloud execution...',
+      content: `[${currentAgent?.name || 'Nexora Brain'}] Planning autonomous cloud execution...`,
       status: 'STREAMING',
       isStreaming: true,
       createdAt: new Date().toISOString(),
@@ -331,7 +438,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const res = await apiFetch(`/api/conversations/${targetConvId}/messages`, {
       method: 'POST',
-      body: JSON.stringify({ content, executeAsTask }),
+      body: JSON.stringify({
+        content,
+        executeAsTask,
+        agentId: currentAgent?.id || 'main-orchestrator',
+      }),
     });
 
     // Replace optimistic ids with actual DB ids
@@ -343,38 +454,49 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       })
     );
 
-    // Refresh tasks to ensure the new task is selected
-    setTimeout(refreshAll, 1000);
+    // Refresh tasks and agents to stay in sync
+    setTimeout(refreshAll, 1200);
   };
 
   const createTaskDirectly = async (prompt: string, priority: 'LOW' | 'NORMAL' | 'HIGH' | 'CRITICAL' = 'NORMAL') => {
-    const task = await apiFetch('/api/tasks', {
+    const res = await apiFetch('/api/tasks', {
       method: 'POST',
       body: JSON.stringify({ prompt, priority }),
     });
-    setTasks((prev) => [task, ...prev]);
-    setActiveTaskId(task.id);
+    setTasks((prev) => [res.task, ...prev]);
+    setActiveTaskId(res.task.id);
     setActiveTab('LIVE_ACTIVITY');
   };
 
   const cancelTask = async (taskId: string) => {
     await apiFetch(`/api/tasks/${taskId}/cancel`, { method: 'POST' });
+    setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status: 'CANCELLED' } : t)));
   };
 
   const pauseTask = async (taskId: string) => {
     await apiFetch(`/api/tasks/${taskId}/pause`, { method: 'POST' });
+    setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status: 'PAUSED' } : t)));
   };
 
   const resumeTask = async (taskId: string) => {
     await apiFetch(`/api/tasks/${taskId}/resume`, { method: 'POST' });
+    setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status: 'RUNNING' } : t)));
   };
 
   const retryTask = async (taskId: string) => {
     await apiFetch(`/api/tasks/${taskId}/retry`, { method: 'POST' });
+    refreshAll();
   };
 
   const emergencyStop = async () => {
-    await apiFetch('/api/tasks/emergency-stop', { method: 'POST' });
+    await apiFetch('/api/emergency-stop', { method: 'POST' });
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.status === 'RUNNING' || t.status === 'QUEUED' || t.status === 'WAITING_FOR_APPROVAL'
+          ? { ...t, status: 'CANCELLED' }
+          : t
+      )
+    );
   };
 
   const resolveApproval = async (approvalId: string, decision: 'APPROVED' | 'REJECTED', reason?: string) => {
@@ -383,6 +505,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       body: JSON.stringify({ decision, reason }),
     });
     setPendingApprovals((prev) => prev.filter((a) => a.id !== approvalId));
+    refreshAll();
   };
 
   const activeTask = tasks.find((t) => t.id === activeTaskId) || null;
@@ -409,6 +532,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         pendingApprovals,
         workers,
         artifacts,
+        agents,
+        activeAgentId,
+        setActiveAgentId,
+        activeAgent,
+        isMemoryModalOpen,
+        setIsMemoryModalOpen,
+        createAgent,
+        generateAgentFromPrompt,
+        deleteAgent,
+        addAgentFact,
+        removeAgentFact,
         createNewConversation,
         deleteConversation,
         sendMessage,

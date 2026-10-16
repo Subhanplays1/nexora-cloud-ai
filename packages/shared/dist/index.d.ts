@@ -4,4 +4,5 @@ export * from './types/chat.js';
 export * from './types/approvals.js';
 export * from './types/artifacts.js';
 export * from './types/events.js';
+export * from './types/agent.js';
 //# sourceMappingURL=index.d.ts.map

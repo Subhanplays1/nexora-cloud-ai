@@ -1,4 +1,4 @@
-import { Task, TaskStep, ChatMessage, Conversation, ApprovalRequest, Artifact } from '@nexora/shared';
+import { Task, TaskStep, ChatMessage, Conversation, ApprovalRequest, Artifact, CustomAgent, AgentMemory } from '@nexora/shared';
 export interface DatabaseService {
     init(): Promise<void>;
     listConversations(): Promise<Conversation[]>;
@@ -24,6 +24,12 @@ export interface DatabaseService {
     createArtifact(art: Omit<Artifact, 'id' | 'createdAt'>): Promise<Artifact>;
     getSetting<T>(key: string, defaultValue?: T): Promise<T | undefined>;
     setSetting<T>(key: string, value: T): Promise<void>;
+    listAgents(): Promise<CustomAgent[]>;
+    getAgent(id: string): Promise<CustomAgent | null>;
+    createAgent(agent: Omit<CustomAgent, 'createdAt' | 'updatedAt'>): Promise<CustomAgent>;
+    updateAgent(id: string, updates: Partial<CustomAgent>): Promise<CustomAgent | null>;
+    deleteAgent(id: string): Promise<void>;
+    updateAgentMemory(id: string, memoryUpdates: Partial<AgentMemory>): Promise<AgentMemory | null>;
 }
 export declare const db: DatabaseService;
 //# sourceMappingURL=index.d.ts.map

@@ -20,4 +20,5 @@ __exportStar(require("./types/chat.js"), exports);
 __exportStar(require("./types/approvals.js"), exports);
 __exportStar(require("./types/artifacts.js"), exports);
 __exportStar(require("./types/events.js"), exports);
+__exportStar(require("./types/agent.js"), exports);
 //# sourceMappingURL=index.js.map

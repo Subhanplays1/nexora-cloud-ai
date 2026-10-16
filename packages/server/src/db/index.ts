@@ -15,6 +15,8 @@ import {
   ApprovalStatus,
   Artifact,
   WorkerType,
+  CustomAgent,
+  AgentMemory,
 } from '@nexora/shared';
 
 export interface DatabaseService {
@@ -53,6 +55,14 @@ export interface DatabaseService {
   // Settings
   getSetting<T>(key: string, defaultValue?: T): Promise<T | undefined>;
   setSetting<T>(key: string, value: T): Promise<void>;
+
+  // Custom Agents & Memory
+  listAgents(): Promise<CustomAgent[]>;
+  getAgent(id: string): Promise<CustomAgent | null>;
+  createAgent(agent: Omit<CustomAgent, 'createdAt' | 'updatedAt'>): Promise<CustomAgent>;
+  updateAgent(id: string, updates: Partial<CustomAgent>): Promise<CustomAgent | null>;
+  deleteAgent(id: string): Promise<void>;
+  updateAgentMemory(id: string, memoryUpdates: Partial<AgentMemory>): Promise<AgentMemory | null>;
 }
 
 class SQLiteDatabaseService implements DatabaseService {
@@ -155,6 +165,20 @@ class SQLiteDatabaseService implements DatabaseService {
       CREATE TABLE IF NOT EXISTS settings (
         key TEXT PRIMARY KEY,
         value_json TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS agents (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        description TEXT NOT NULL,
+        system_prompt TEXT NOT NULL,
+        avatar_key TEXT NOT NULL,
+        color_hex TEXT NOT NULL,
+        capabilities_json TEXT NOT NULL,
+        memory_json TEXT NOT NULL,
+        is_main INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       );
     `);
@@ -628,6 +652,138 @@ class SQLiteDatabaseService implements DatabaseService {
       ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json, updated_at = excluded.updated_at
     `).run(key, JSON.stringify(value), now);
   }
+
+  private getDefaultMainAgent(): CustomAgent {
+    const now = new Date().toISOString();
+    return {
+      id: 'main-orchestrator',
+      name: 'Nexora Brain',
+      description: 'Autonomous Task Orchestrator & Multi-Agent Synthesizer. Tell me what you need and I will plan, execute, or build specialized bots for you.',
+      systemPrompt: 'You are Nexora Brain, the master autonomous orchestrator and bot architect. You plan, execute, coordinate tasks, and synthesize specialized custom agents for the user.',
+      avatarKey: 'orchestrator',
+      colorHex: '#3B82F6',
+      capabilities: ['ORCHESTRATOR', 'RESEARCH', 'WRITING', 'IMAGE_GEN', 'BROWSER', 'CODE_RUNNER'],
+      memory: {
+        userFacts: [
+          'User name: Subhan Zahid',
+          'Platform: Nexora AI Personal Cloud Desktop Agent',
+          'Preferences: Fast execution, persistent background cloud jobs, high retention quality',
+        ],
+        instructions: [
+          'Always prioritize persistent cloud execution',
+          'Create specialized bots when requested by user',
+          'Remember all facts the user teaches you',
+        ],
+        summary: 'Nexora Brain master orchestrator initialized for Subhan Zahid.',
+        lastUpdated: now,
+      },
+      isMainAgent: true,
+      createdAt: now,
+      updatedAt: now,
+    };
+  }
+
+  private mapSqliteAgent(row: any): CustomAgent {
+    return {
+      id: row.id,
+      name: row.name,
+      description: row.description,
+      systemPrompt: row.system_prompt,
+      avatarKey: row.avatar_key,
+      colorHex: row.color_hex,
+      capabilities: row.capabilities_json ? JSON.parse(row.capabilities_json) : [],
+      memory: row.memory_json ? JSON.parse(row.memory_json) : { userFacts: [], instructions: [], summary: '', lastUpdated: row.updated_at },
+      isMainAgent: Boolean(row.is_main),
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
+  }
+
+  async listAgents(): Promise<CustomAgent[]> {
+    const rows = this.db.prepare('SELECT * FROM agents ORDER BY is_main DESC, created_at ASC').all() as any[];
+    if (rows.length === 0) {
+      const defaultAgent = this.getDefaultMainAgent();
+      await this.createAgent(defaultAgent);
+      return [defaultAgent];
+    }
+    return rows.map((r) => this.mapSqliteAgent(r));
+  }
+
+  async getAgent(id: string): Promise<CustomAgent | null> {
+    const row = this.db.prepare('SELECT * FROM agents WHERE id = ?').get(id) as any;
+    if (!row) return null;
+    return this.mapSqliteAgent(row);
+  }
+
+  async createAgent(agent: Omit<CustomAgent, 'createdAt' | 'updatedAt'>): Promise<CustomAgent> {
+    const now = new Date().toISOString();
+    const fullAgent: CustomAgent = {
+      ...agent,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.db.prepare(`
+      INSERT INTO agents (
+        id, name, description, system_prompt, avatar_key, color_hex, capabilities_json, memory_json, is_main, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      fullAgent.id,
+      fullAgent.name,
+      fullAgent.description,
+      fullAgent.systemPrompt,
+      fullAgent.avatarKey,
+      fullAgent.colorHex,
+      JSON.stringify(fullAgent.capabilities || []),
+      JSON.stringify(fullAgent.memory),
+      fullAgent.isMainAgent ? 1 : 0,
+      fullAgent.createdAt,
+      fullAgent.updatedAt
+    );
+    return fullAgent;
+  }
+
+  async updateAgent(id: string, updates: Partial<CustomAgent>): Promise<CustomAgent | null> {
+    const existing = await this.getAgent(id);
+    if (!existing) return null;
+    const updated: CustomAgent = {
+      ...existing,
+      ...updates,
+      updatedAt: new Date().toISOString(),
+    };
+    this.db.prepare(`
+      UPDATE agents SET
+        name = ?, description = ?, system_prompt = ?, avatar_key = ?, color_hex = ?, capabilities_json = ?, memory_json = ?, updated_at = ?
+      WHERE id = ?
+    `).run(
+      updated.name,
+      updated.description,
+      updated.systemPrompt,
+      updated.avatarKey,
+      updated.colorHex,
+      JSON.stringify(updated.capabilities || []),
+      JSON.stringify(updated.memory),
+      updated.updatedAt,
+      id
+    );
+    return updated;
+  }
+
+  async deleteAgent(id: string): Promise<void> {
+    this.db.prepare('DELETE FROM agents WHERE id = ? AND is_main = 0').run(id);
+  }
+
+  async updateAgentMemory(id: string, memoryUpdates: Partial<AgentMemory>): Promise<AgentMemory | null> {
+    const agent = await this.getAgent(id);
+    if (!agent) return null;
+    const newMemory: AgentMemory = {
+      userFacts: memoryUpdates.userFacts ?? agent.memory.userFacts ?? [],
+      instructions: memoryUpdates.instructions ?? agent.memory.instructions ?? [],
+      summary: memoryUpdates.summary ?? agent.memory.summary ?? '',
+      lastUpdated: new Date().toISOString(),
+    };
+    await this.updateAgent(id, { memory: newMemory });
+    return newMemory;
+  }
 }
 
 // PostgreSQL Implementation for VPS / Production
@@ -731,6 +887,20 @@ class PostgresDatabaseService implements DatabaseService {
         key VARCHAR(128) PRIMARY KEY,
         value_json TEXT NOT NULL,
         updated_at TIMESTAMPTZ NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS agents (
+        id VARCHAR(64) PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        description TEXT NOT NULL,
+        system_prompt TEXT NOT NULL,
+        avatar_key VARCHAR(64) NOT NULL,
+        color_hex VARCHAR(32) NOT NULL,
+        capabilities_json TEXT NOT NULL,
+        memory_json TEXT NOT NULL,
+        is_main BOOLEAN NOT NULL DEFAULT FALSE,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
     `);
   }
@@ -1170,6 +1340,132 @@ class PostgresDatabaseService implements DatabaseService {
       startedAt: row.started_at ? row.started_at.toISOString() : undefined,
       completedAt: row.completed_at ? row.completed_at.toISOString() : undefined,
     };
+  }
+
+  private mapPgAgent(row: any): CustomAgent {
+    return {
+      id: row.id,
+      name: row.name,
+      description: row.description,
+      systemPrompt: row.system_prompt,
+      avatarKey: row.avatar_key,
+      colorHex: row.color_hex,
+      capabilities: row.capabilities_json ? JSON.parse(row.capabilities_json) : [],
+      memory: row.memory_json ? JSON.parse(row.memory_json) : { userFacts: [], instructions: [], summary: '', lastUpdated: row.updated_at.toISOString() },
+      isMainAgent: Boolean(row.is_main),
+      createdAt: row.created_at.toISOString(),
+      updatedAt: row.updated_at.toISOString(),
+    };
+  }
+
+  async listAgents(): Promise<CustomAgent[]> {
+    const res = await this.pool.query('SELECT * FROM agents ORDER BY is_main DESC, created_at ASC');
+    if (res.rows.length === 0) {
+      const now = new Date().toISOString();
+      const defaultAgent: CustomAgent = {
+        id: 'main-orchestrator',
+        name: 'Nexora Brain',
+        description: 'Autonomous Task Orchestrator & Multi-Agent Synthesizer. Tell me what you need and I will plan, execute, or build specialized bots for you.',
+        systemPrompt: 'You are Nexora Brain, the master autonomous orchestrator and bot architect. You plan, execute, coordinate tasks, and synthesize specialized custom agents for the user.',
+        avatarKey: 'orchestrator',
+        colorHex: '#3B82F6',
+        capabilities: ['ORCHESTRATOR', 'RESEARCH', 'WRITING', 'IMAGE_GEN', 'BROWSER', 'CODE_RUNNER'],
+        memory: {
+          userFacts: [
+            'User name: Subhan Zahid',
+            'Platform: Nexora AI Personal Cloud Desktop Agent',
+            'Preferences: Fast execution, persistent background cloud jobs, high retention quality',
+          ],
+          instructions: [
+            'Always prioritize persistent cloud execution',
+            'Create specialized bots when requested by user',
+            'Remember all facts the user teaches you',
+          ],
+          summary: 'Nexora Brain master orchestrator initialized for Subhan Zahid.',
+          lastUpdated: now,
+        },
+        isMainAgent: true,
+        createdAt: now,
+        updatedAt: now,
+      };
+      await this.createAgent(defaultAgent);
+      return [defaultAgent];
+    }
+    return res.rows.map((r) => this.mapPgAgent(r));
+  }
+
+  async getAgent(id: string): Promise<CustomAgent | null> {
+    const res = await this.pool.query('SELECT * FROM agents WHERE id = $1', [id]);
+    if (res.rows.length === 0) return null;
+    return this.mapPgAgent(res.rows[0]);
+  }
+
+  async createAgent(agent: Omit<CustomAgent, 'createdAt' | 'updatedAt'>): Promise<CustomAgent> {
+    const now = new Date();
+    const res = await this.pool.query(`
+      INSERT INTO agents (
+        id, name, description, system_prompt, avatar_key, color_hex, capabilities_json, memory_json, is_main, created_at, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      RETURNING *
+    `, [
+      agent.id,
+      agent.name,
+      agent.description,
+      agent.systemPrompt,
+      agent.avatarKey,
+      agent.colorHex,
+      JSON.stringify(agent.capabilities || []),
+      JSON.stringify(agent.memory),
+      Boolean(agent.isMainAgent),
+      now,
+      now,
+    ]);
+    return this.mapPgAgent(res.rows[0]);
+  }
+
+  async updateAgent(id: string, updates: Partial<CustomAgent>): Promise<CustomAgent | null> {
+    const existing = await this.getAgent(id);
+    if (!existing) return null;
+    const updated: CustomAgent = {
+      ...existing,
+      ...updates,
+      updatedAt: new Date().toISOString(),
+    };
+    const res = await this.pool.query(`
+      UPDATE agents SET
+        name = $1, description = $2, system_prompt = $3, avatar_key = $4, color_hex = $5, capabilities_json = $6, memory_json = $7, updated_at = $8
+      WHERE id = $9
+      RETURNING *
+    `, [
+      updated.name,
+      updated.description,
+      updated.systemPrompt,
+      updated.avatarKey,
+      updated.colorHex,
+      JSON.stringify(updated.capabilities || []),
+      JSON.stringify(updated.memory),
+      new Date(),
+      id,
+    ]);
+    if (res.rows.length === 0) return null;
+    return this.mapPgAgent(res.rows[0]);
+  }
+
+  async deleteAgent(id: string): Promise<void> {
+    await this.pool.query('DELETE FROM agents WHERE id = $1 AND is_main = FALSE', [id]);
+  }
+
+  async updateAgentMemory(id: string, memoryUpdates: Partial<AgentMemory>): Promise<AgentMemory | null> {
+    const agent = await this.getAgent(id);
+    if (!agent) return null;
+    const newMemory: AgentMemory = {
+      userFacts: memoryUpdates.userFacts ?? agent.memory.userFacts ?? [],
+      instructions: memoryUpdates.instructions ?? agent.memory.instructions ?? [],
+      summary: memoryUpdates.summary ?? agent.memory.summary ?? '',
+      lastUpdated: new Date().toISOString(),
+    };
+    await this.updateAgent(id, { memory: newMemory });
+    return newMemory;
   }
 }
 

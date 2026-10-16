@@ -1,215 +1,275 @@
 import React, { useState } from 'react';
 import {
-  MessageSquare,
-  Activity,
-  CheckSquare,
-  FolderOpen,
-  Share2,
-  Settings,
   Plus,
   Trash2,
   ChevronLeft,
   ChevronRight,
+  Activity,
+  CheckSquare,
+  FolderOpen,
+  Settings,
   ShieldAlert,
-  Zap,
-  Globe,
+  Brain,
+  Monitor,
 } from 'lucide-react';
-import { useApp, NavTab } from '../context/AppContext';
-
+import { useApp } from '../context/AppContext';
 import { WorkerAvatar } from './common/WorkerAvatar';
 
 export const Sidebar: React.FC = () => {
   const {
     activeTab,
     setActiveTab,
-    conversations,
-    activeConversationId,
-    setActiveConversationId,
-    createNewConversation,
-    deleteConversation,
+    agents,
+    activeAgentId,
+    setActiveAgentId,
+    deleteAgent,
+    setIsMemoryModalOpen,
     tasks,
-    pendingApprovals,
     connected,
     emergencyStop,
   } = useApp();
 
   const [collapsed, setCollapsed] = useState(false);
 
-  const runningTaskCount = tasks.filter((t) => t.status === 'RUNNING' || t.status === 'QUEUED').length;
+  const runningTaskCount = tasks.filter(
+    (t) => t.status === 'RUNNING' || t.status === 'QUEUED'
+  ).length;
 
-  const navItems: { tab: NavTab; label: string; icon: React.ReactNode; badge?: number | string }[] = [
-    { tab: 'CHAT', label: 'Chat & Planner', icon: <MessageSquare size={18} /> },
-    {
-      tab: 'LIVE_ACTIVITY',
-      label: 'Live Activity',
-      icon: <Activity size={18} />,
-      badge: runningTaskCount > 0 ? `${runningTaskCount} running` : undefined,
-    },
-    { tab: 'TASKS', label: 'Tasks', icon: <CheckSquare size={18} />, badge: tasks.length },
-    { tab: 'FILES', label: 'Files & Artifacts', icon: <FolderOpen size={18} /> },
-    { tab: 'INTEGRATIONS', label: 'Integrations', icon: <Share2 size={18} /> },
-    { tab: 'SETTINGS', label: 'Settings', icon: <Settings size={18} /> },
-  ];
+  const customAgents = agents.filter((a) => !a.isMainAgent);
+  const mainAgent = agents.find((a) => a.isMainAgent) || agents[0];
 
   return (
     <aside
-      className={`h-screen flex flex-col bg-surface-900 border-r border-surface-750 transition-all duration-300 ${
-        collapsed ? 'w-18' : 'w-64'
+      className={`h-screen flex flex-col bg-slate-100/90 dark:bg-surface-900 border-r border-slate-200 dark:border-surface-750 transition-all duration-300 font-sans select-none ${
+        collapsed ? 'w-20' : 'w-72'
       }`}
     >
-      {/* Brand & Collapse Header */}
-      <div className="p-3.5 flex items-center justify-between border-b border-surface-800">
-        {collapsed ? (
-          <div className="flex justify-center w-full py-1">
-            <WorkerAvatar type="ORCHESTRATOR" size="sm" showGlow={true} />
-          </div>
-        ) : (
-          <div className="flex items-center space-x-2.5">
-            <WorkerAvatar type="ORCHESTRATOR" size="sm" showGlow={true} />
-            <div>
-              <div className="flex items-center space-x-1.5">
-                <span className="font-extrabold tracking-tight text-white text-base">NEXORA</span>
-                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
-                  AI
-                </span>
-              </div>
-              <p className="text-[10px] text-slate-400">Autonomous Cloud Agent</p>
-            </div>
-          </div>
-        )}
+      {/* Top Header with macOS Window Controls */}
+      <div className="p-4 flex items-center justify-between border-b border-slate-200/60 dark:border-surface-800">
+        <div className="flex items-center space-x-2">
+          {/* macOS window dots */}
+          <span className="w-3 h-3 rounded-full bg-[#FF5F56] border border-[#E0443E] shadow-xs inline-block" />
+          <span className="w-3 h-3 rounded-full bg-[#FFBD2E] border border-[#DEA123] shadow-xs inline-block" />
+          <span className="w-3 h-3 rounded-full bg-[#27C93F] border border-[#1AAB29] shadow-xs inline-block" />
+        </div>
 
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-surface-800 transition"
+          className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white transition"
           title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         >
-          {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+          {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
         </button>
       </div>
 
-      {/* New Chat Button */}
+      {/* Prominent "Create your first Bot" Button (Matching Screenshot) */}
       <div className="p-3">
         <button
-          onClick={createNewConversation}
-          className={`w-full flex items-center justify-center space-x-2 px-3 py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white font-medium text-sm transition shadow-lg shadow-cyan-600/20 ${
-            collapsed ? 'px-0' : ''
-          }`}
-          title="New Task Chat"
+          onClick={() => setActiveTab('CREATE_BOT')}
+          className={`w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-2xl transition-all duration-200 shadow-sm cursor-pointer ${
+            activeTab === 'CREATE_BOT'
+              ? 'bg-slate-200 dark:bg-surface-800 text-slate-900 dark:text-white font-bold ring-2 ring-cyan-500/30'
+              : 'bg-slate-200/70 dark:bg-surface-850 hover:bg-slate-200 dark:hover:bg-surface-800 text-slate-700 dark:text-slate-200 font-semibold'
+          } ${collapsed ? 'justify-center px-0' : ''}`}
+          title="Create a new autonomous Bot"
         >
-          <Plus size={18} />
-          {!collapsed && <span>New Task</span>}
+          <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white flex-shrink-0 shadow-sm">
+            <Plus size={16} />
+          </div>
+          {!collapsed && (
+            <span className="text-sm truncate">
+              {customAgents.length === 0 ? 'Create your first Bot' : 'Create New Bot'}
+            </span>
+          )}
         </button>
       </div>
 
-      {/* Main Navigation */}
-      <nav className="px-2 space-y-1">
-        {navItems.map((item) => {
-          const isActive = activeTab === item.tab;
-          return (
-            <button
-              key={item.tab}
-              onClick={() => setActiveTab(item.tab)}
-              className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm font-medium transition ${
-                isActive
-                  ? 'bg-surface-800 text-cyan-400 shadow-sm border border-surface-700/60'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-surface-850'
-              }`}
-              title={item.label}
+      {/* Main Agent (Nexora Brain Orchestrator) */}
+      {mainAgent && !collapsed && (
+        <div className="px-3 pt-1 pb-2">
+          <div
+            onClick={() => setActiveAgentId(mainAgent.id)}
+            className={`flex items-center space-x-3 px-3 py-2 rounded-2xl cursor-pointer transition ${
+              activeAgentId === mainAgent.id && activeTab === 'CHAT'
+                ? 'bg-cyan-500/15 border border-cyan-500/40 text-cyan-600 dark:text-cyan-300 font-bold shadow-sm'
+                : 'hover:bg-slate-200/50 dark:hover:bg-surface-850 text-slate-700 dark:text-slate-300'
+            }`}
+          >
+            <div
+              className="w-8 h-8 rounded-full flex items-center justify-center p-0.5 text-white flex-shrink-0 shadow-xs"
+              style={{ backgroundColor: mainAgent.colorHex || '#3B82F6' }}
             >
-              <div className="flex items-center space-x-3">
-                <span className={isActive ? 'text-cyan-400' : 'text-slate-400'}>{item.icon}</span>
-                {!collapsed && <span>{item.label}</span>}
+              <WorkerAvatar type={mainAgent.avatarKey} size="xs" showGlow={false} />
+            </div>
+
+            <div className="flex-1 truncate text-left">
+              <div className="text-xs font-bold leading-tight flex items-center space-x-1.5">
+                <span>{mainAgent.name}</span>
+                <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-cyan-500/20 text-cyan-500 font-mono font-bold">
+                  MAIN
+                </span>
+              </div>
+              <div className="text-[10px] text-slate-400 truncate">Bot Architect & Planner</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Middle Section: Dynamic Bots List or "No chats yet" */}
+      <div className="flex-1 overflow-y-auto px-3 py-1 space-y-1">
+        {!collapsed && customAgents.length > 0 && (
+          <div className="text-[10px] font-bold text-slate-400 dark:text-slate-400 uppercase tracking-wider px-2 pt-2 pb-1">
+            Your Custom Bots ({customAgents.length})
+          </div>
+        )}
+
+        {customAgents.map((bot) => {
+          const isSelected = activeAgentId === bot.id && activeTab === 'CHAT';
+
+          return (
+            <div
+              key={bot.id}
+              onClick={() => setActiveAgentId(bot.id)}
+              className={`group flex items-center justify-between px-3 py-2 rounded-2xl cursor-pointer transition ${
+                isSelected
+                  ? 'bg-slate-200 dark:bg-surface-800 text-slate-900 dark:text-white font-bold shadow-sm ring-1 ring-cyan-500/40'
+                  : 'hover:bg-slate-200/60 dark:hover:bg-surface-850 text-slate-700 dark:text-slate-300'
+              } ${collapsed ? 'justify-center px-0' : ''}`}
+              title={`${bot.name}: ${bot.description}`}
+            >
+              <div className="flex items-center space-x-3 truncate">
+                <div
+                  className="w-8 h-8 rounded-full flex items-center justify-center p-0.5 text-white flex-shrink-0 shadow-xs"
+                  style={{ backgroundColor: bot.colorHex }}
+                >
+                  <WorkerAvatar type={bot.avatarKey} size="xs" showGlow={false} />
+                </div>
+
+                {!collapsed && (
+                  <div className="truncate text-left">
+                    <div className="text-xs font-bold truncate leading-tight">{bot.name}</div>
+                    <div className="text-[10px] text-slate-400 truncate leading-tight mt-0.5">
+                      {bot.description || 'Specialized bot'}
+                    </div>
+                  </div>
+                )}
               </div>
 
-              {!collapsed && item.badge && (
-                <span
-                  className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
-                    typeof item.badge === 'string' && item.badge.includes('running')
-                      ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 animate-pulse'
-                      : 'bg-surface-800 text-slate-400'
-                  }`}
+              {!collapsed && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    deleteAgent(bot.id);
+                  }}
+                  className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-red-500 transition"
+                  title="Delete bot"
                 >
-                  {item.badge}
-                </span>
+                  <Trash2 size={13} />
+                </button>
               )}
-            </button>
+            </div>
           );
         })}
-      </nav>
 
-      {/* Approvals Warning Badge */}
-      {pendingApprovals.length > 0 && !collapsed && (
-        <div className="mx-3 my-2 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center space-x-2 text-amber-300">
-          <ShieldAlert size={16} className="text-amber-400 flex-shrink-0 animate-bounce" />
-          <span className="text-xs font-medium">{pendingApprovals.length} action requires approval</span>
-        </div>
-      )}
-
-      {/* Conversations History List */}
-      {!collapsed && (
-        <div className="flex-1 overflow-y-auto px-3 mt-4 border-t border-surface-800/80 pt-3">
-          <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2 px-1">
-            Recent Sessions
+        {/* Empty state: "No chats yet" matching screenshot */}
+        {!collapsed && customAgents.length === 0 && (
+          <div className="h-44 flex flex-col items-center justify-center text-center p-4">
+            <span className="text-sm font-medium text-slate-400 dark:text-slate-400">
+              No chats yet
+            </span>
+            <p className="text-[11px] text-slate-400 mt-1 max-w-[180px]">
+              Click "+ Create your first Bot" above or ask the Main Agent to build one for you.
+            </p>
           </div>
-          <div className="space-y-1">
-            {conversations.map((c) => {
-              const isSelected = activeConversationId === c.id;
-              return (
-                <div
-                  key={c.id}
-                  onClick={() => {
-                    setActiveConversationId(c.id);
-                    setActiveTab('CHAT');
-                  }}
-                  className={`group flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs cursor-pointer transition ${
-                    isSelected
-                      ? 'bg-surface-800 text-slate-100 font-medium'
-                      : 'text-slate-400 hover:text-slate-300 hover:bg-surface-850'
-                  }`}
-                >
-                  <span className="truncate pr-2">{c.title || 'Untitled Session'}</span>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      deleteConversation(c.id);
-                    }}
-                    className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-400 transition"
-                    title="Delete session"
-                  >
-                    <Trash2 size={13} />
-                  </button>
-                </div>
-              );
-            })}
-            {conversations.length === 0 && (
-              <p className="text-xs text-slate-400 px-2 py-4 italic">No past sessions</p>
-            )}
-          </div>
-        </div>
-      )}
+        )}
+      </div>
 
-      {/* Footer Controls: Emergency Stop & Connection Status */}
-      <div className="mt-auto p-3 border-t border-surface-800 space-y-2">
+      {/* Cloud Subsystem Quick Bar (Live Activity, Tasks, Settings) */}
+      <div className="px-3 py-2 border-t border-slate-200/60 dark:border-surface-800 space-y-0.5">
         <button
-          onClick={emergencyStop}
-          className="w-full flex items-center justify-center space-x-2 px-2.5 py-1.5 rounded-lg bg-red-950/40 hover:bg-red-900/60 border border-red-800/60 text-red-300 text-xs font-semibold transition"
-          title="Global Emergency Stop"
+          onClick={() => setActiveTab('LIVE_ACTIVITY')}
+          className={`w-full flex items-center justify-between px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
+            activeTab === 'LIVE_ACTIVITY'
+              ? 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400'
+              : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-surface-850'
+          }`}
+          title="Live Remote Sandbox"
         >
-          <ShieldAlert size={14} className="text-red-400" />
-          {!collapsed && <span>Emergency Stop</span>}
+          <div className="flex items-center space-x-2.5">
+            <Monitor size={15} />
+            {!collapsed && <span>Live Sandbox</span>}
+          </div>
+          {!collapsed && runningTaskCount > 0 && (
+            <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
+          )}
         </button>
 
-        <div className="flex items-center justify-between text-[11px] px-1 text-slate-400">
-          <div className="flex items-center space-x-1.5">
-            <span
-              className={`w-2 h-2 rounded-full ${
-                connected ? 'bg-emerald-400 shadow-sm shadow-emerald-400' : 'bg-rose-500 animate-ping'
-              }`}
-            />
-            {!collapsed && <span>{connected ? 'Cloud Connected' : 'Reconnecting...'}</span>}
+        <button
+          onClick={() => setActiveTab('TASKS')}
+          className={`w-full flex items-center justify-between px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
+            activeTab === 'TASKS'
+              ? 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400'
+              : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-surface-850'
+          }`}
+          title="Task Queue"
+        >
+          <div className="flex items-center space-x-2.5">
+            <CheckSquare size={15} />
+            {!collapsed && <span>Tasks Queue</span>}
           </div>
           {!collapsed && (
-            <span className="text-[10px] text-slate-400 font-mono">v1.0.0</span>
+            <span className="text-[10px] text-slate-400 font-mono">{tasks.length}</span>
+          )}
+        </button>
+
+        <button
+          onClick={() => setActiveTab('SETTINGS')}
+          className={`w-full flex items-center space-x-2.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
+            activeTab === 'SETTINGS'
+              ? 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400'
+              : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-surface-850'
+          }`}
+          title="Settings"
+        >
+          <Settings size={15} />
+          {!collapsed && <span>Settings</span>}
+        </button>
+      </div>
+
+      {/* Bottom User Profile Section (Matching Screenshot) */}
+      <div className="p-3 border-t border-slate-200/60 dark:border-surface-800 bg-slate-50/50 dark:bg-surface-950/40">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-2.5 truncate">
+            {/* User Avatar */}
+            <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-amber-400 to-orange-500 flex items-center justify-center text-white font-extrabold text-xs shadow-xs flex-shrink-0">
+              SZ
+            </div>
+
+            {!collapsed && (
+              <div className="truncate text-left">
+                <div className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">
+                  Subhan Zahid
+                </div>
+                <div className="flex items-center space-x-1.5 text-[10px] text-slate-400">
+                  <span
+                    className={`w-1.5 h-1.5 rounded-full ${
+                      connected ? 'bg-emerald-400' : 'bg-rose-500'
+                    }`}
+                  />
+                  <span>{connected ? 'Cloud Connected' : 'Connecting...'}</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {!collapsed && (
+            <button
+              onClick={emergencyStop}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-500/10 transition"
+              title="Global Emergency Stop"
+            >
+              <ShieldAlert size={14} />
+            </button>
           )}
         </div>
       </div>
