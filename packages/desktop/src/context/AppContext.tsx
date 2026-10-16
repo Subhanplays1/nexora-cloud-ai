@@ -52,7 +52,7 @@ const AppContext = createContext<AppContextType | null>(null);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [backendUrl, setBackendUrlState] = useState<string>(() => {
-    return localStorage.getItem('nexora_backend_url') || 'http://localhost:3001';
+    return localStorage.getItem('nexora_backend_url') || 'https://nexora-cloud-ai.onrender.com';
   });
 
   const [connected, setConnected] = useState(false);
