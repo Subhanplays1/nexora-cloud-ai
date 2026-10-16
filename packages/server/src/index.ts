@@ -1,3 +1,5 @@
+import path from 'node:path';
+import fs from 'node:fs';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import fastifyStatic from '@fastify/static';
@@ -37,6 +39,39 @@ async function bootstrap() {
     root: config.storageDir,
     prefix: '/artifacts/',
   });
+
+  // Register static desktop frontend if present
+  const candidateDists = [
+    path.resolve(process.cwd(), 'packages/desktop/dist'),
+    path.resolve(process.cwd(), '../desktop/dist'),
+    path.resolve('D:/nexora-ai/packages/desktop/dist'),
+  ];
+  let desktopDist: string | null = null;
+  for (const c of candidateDists) {
+    if (fs.existsSync(c)) {
+      desktopDist = c;
+      break;
+    }
+  }
+
+  if (desktopDist) {
+    console.log(`[Frontend] Serving desktop UI from: ${desktopDist}`);
+    await app.register(fastifyStatic, {
+      root: desktopDist,
+      prefix: '/',
+      decorateReply: false,
+    });
+
+    app.setNotFoundHandler((req, reply) => {
+      if (req.raw.url && req.raw.url.startsWith('/api')) {
+        reply.status(404).send({ error: 'Endpoint not found' });
+      } else if (desktopDist && fs.existsSync(path.join(desktopDist, 'index.html'))) {
+        reply.sendFile('index.html', desktopDist);
+      } else {
+        reply.status(404).send({ error: 'Not found' });
+      }
+    });
+  }
 
   // Register WebSocket plugin
   await app.register(fastifyWebSocket);

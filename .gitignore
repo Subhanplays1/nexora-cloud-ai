@@ -8,4 +8,5 @@ storage/*
 !storage/.gitkeep
 workspaces/*
 !workspaces/.gitkeep
+desktop-profile/
 *.log

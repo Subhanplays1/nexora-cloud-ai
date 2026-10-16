@@ -4,7 +4,7 @@ services:
     runtime: node
     plan: free
     region: oregon
-    buildCommand: npm install && npm run build:shared && npm run build:server
+    buildCommand: npm install && npm run build:shared && npm run build:desktop && npm run build:server
     startCommand: npm run start:server
     healthCheckPath: /api/health
     envVars:
